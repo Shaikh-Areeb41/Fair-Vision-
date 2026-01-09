@@ -20,7 +20,6 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { toast } from "sonner";
 
-// --- REMOVED LOGIN PAGE IMPORT ---
 
 type User = {
   name: string;
@@ -167,8 +166,6 @@ function AppContent() {
     );
   };
 
-  // 3. REMOVED THE LOGIN CHECK BLOCK HERE
-  // The app will now render the main UI immediately
 
   if (state.isLoading) {
     return (
@@ -181,7 +178,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col ">
       {/* 4. TopNav will now show "Demo User" */}
       <TopNav userName={state.user?.name || "Demo User"} />
       <div className="flex-1 overflow-auto">

@@ -6,36 +6,20 @@ import {
   AlertTriangle,
   CheckCircle,
   Upload,
-  FileText,
   Target,
   Database,
   Loader2,
-  Search,
   Scale,
   ArrowRight,
   LayoutDashboard,
   Table as TableIcon,
   ChevronDown,
   ChevronUp,
-  Activity,
-  AlertOctagon,
-  ShieldCheck,
-  XCircle,
-  Filter
+  Activity
 } from "lucide-react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-  CartesianGrid,
-  Legend,
-  Cell
-} from "recharts";
 import { toast } from "sonner";
-
+import { BiasBarChart } from "../components/Charts/BiasBarChart"; // Adjust path as needed
+import { BiasVerticalBar } from "../components/Charts/BiasVerticalBar";
 // --- INLINE UI COMPONENTS ---
 const Button = ({ className, variant = "default", size = "default", ...props }: any) => {
   const variants: any = {
@@ -81,34 +65,6 @@ const CardDescription = ({ className, ...props }: any) => (
 );
 const CardContent = ({ className, ...props }: any) => (
   <div className={`p-6 pt-0 ${className || ""}`} {...props} />
-);
-
-// --- REUSABLE CHART COMPONENT ---
-const ComparisonChart = ({ data, title, description, color1 = "#8b5cf6", color2 = "#ec4899" }: any) => (
-  <Card className="glass-card h-full">
-    <CardHeader className="pb-2">
-      <CardTitle className="text-sm font-semibold text-foreground">{title}</CardTitle>
-      <CardDescription className="text-xs">{description}</CardDescription>
-    </CardHeader>
-    <CardContent className="h-[180px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
-          <XAxis type="number" domain={[0, 100]} unit="%" hide />
-          <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} />
-          <Tooltip
-            cursor={{ fill: 'transparent' }}
-            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
-          />
-          <Bar dataKey="rate" radius={[0, 4, 4, 0]} barSize={20}>
-             {data.map((entry: any, index: number) => (
-                <Cell key={`cell-${index}`} fill={index === 0 ? color1 : color2} />
-              ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </CardContent>
-  </Card>
 );
 
 interface DashboardProps {
@@ -248,28 +204,28 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
       value: analysisResults.dpd.toFixed(3),
       delta: analysisResults.dpd > 0.1 ? "Critical Bias" : "Acceptable",
       Icon: AlertTriangle,
-      tint: analysisResults.dpd > 0.1 ? "from-rose-100 to-orange-100" : "from-emerald-100 to-green-100",
+      tint: analysisResults.dpd > 0.1 ? "from-rose-800 to-orange-800" : "from-emerald-800 to-green-800",
     },
     {
       label: "Disparate Impact (DI)",
       value: analysisResults.di.toFixed(2),
       delta: analysisResults.di < 0.8 ? "Adverse Impact" : "Fair",
       Icon: Scale,
-      tint: analysisResults.di < 0.8 ? "from-rose-100 to-red-100" : "from-sky-100 to-blue-100",
+      tint: analysisResults.di < 0.8 ? "from-rose-800 to-red-800" : "from-sky-800 to-blue-800",
     },
     {
       label: "Model Accuracy",
       value: `${(analysisResults.accuracy * 100).toFixed(1)}%`,
       delta: "Baseline Performance",
       Icon: CheckCircle,
-      tint: "from-emerald-100 to-teal-100",
+      tint: "from-emerald-800 to-teal-800",
     },
     {
       label: "Fairness Gap",
       value: `${((analysisResults.privileged_rate - analysisResults.unprivileged_rate) * 100).toFixed(1)}%`,
       delta: "Difference in Selection",
       Icon: BarChart3,
-      tint: "from-violet-100 to-indigo-100",
+      tint: "from-violet-800 to-indigo-800",
     },
   ] : [];
 
@@ -282,7 +238,7 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
       <div className="flex flex-col gap-2 mb-6">
-        <h1 className="text-3xl font-bold text-foreground tracking-tight">
+        <h1 className="text-3xl font-bold text-foreground tracking-tight ">
           Bias Overview Dashboard
         </h1>
         <p className="text-muted-foreground">
@@ -382,59 +338,45 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
                   </div>
 
                   {/* 2. Main Disparity Chart (Selection Rate) */}
-                  <Card className="glass-card border-l-4 border-l-violet-500">
-                    <CardHeader>
-                      <CardTitle>Selection Rate Disparity</CardTitle>
-                      <CardDescription>
-                        Comparing how often the model selects the Privileged vs. Unprivileged group.
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="h-[250px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartDataSelection} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.5} />
-                          <XAxis type="number" domain={[0, 100]} unit="%" />
-                          <YAxis dataKey="name" type="category" width={120} tick={{fontSize: 12}} />
-                          <Tooltip 
-                            cursor={{fill: 'transparent'}}
-                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                          />
-                          <Bar dataKey="rate" radius={[0, 4, 4, 0]} barSize={40}>
-                            {chartDataSelection.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={index === 0 ? "#8b5cf6" : "#ec4899"} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </CardContent>
-                  </Card>
+                  <div className="border-l-4 border-l-violet-500 rounded-xl">
+                    <BiasBarChart
+                      title="Selection Rate Disparity"
+                      description="Comparing how often the model selects the Privileged vs. Unprivileged group."
+                      data={chartDataSelection}
+                      height={250}
+                      colors={["#8b5cf6", "#ec4899"]} // Violet/Pink
+                    />
+                  </div>
 
-                  {/* 3. Detailed Analysis Grid (NEW 3 CHARTS) */}
+                  {/* 3. Detailed Analysis Grid (SIMPLIFIED) */}
                   <div>
                       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-muted-foreground" /> Detailed Performance Analysis
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Chart A: Accuracy */}
-                      <ComparisonChart 
+                      
+                      {/* Chart A: Accuracy -> Vertical Bar Chart */}
+                      <BiasVerticalBar 
+                        title="Accuracy Comparison" 
+                        description="How accurate is the model for each group? (Higher is better)"
                         data={chartDataAcc} 
-                        title="Accuracy Parity" 
-                        description="Does the model work equally well for both groups?"
-                        color1="#10b981" color2="#34d399" // Green/Emerald
+                        colors={["#10b981", "#34d399"]} // Emerald (Good)
                       />
-                      {/* Chart B: FPR */}
-                      <ComparisonChart 
+
+                      {/* Chart B: FPR -> Vertical Bar Chart */}
+                      <BiasVerticalBar 
+                        title="False Positive Rate" 
+                        description="Percentage incorrectly marked as 'positive'. (Lower is better)"
                         data={chartDataFPR} 
-                        title="False Positive Rate (FPR)" 
-                        description="Who is 'falsely accused' or incorrectly benefited?"
-                        color1="#f59e0b" color2="#fbbf24" // Amber/Yellow
+                        colors={["#f59e0b", "#fbbf24"]} // Amber (Risk)
                       />
-                      {/* Chart C: TPR */}
-                      <ComparisonChart 
+
+                      {/* Chart C: TPR -> Vertical Bar Chart (Kept the same) */}
+                      <BiasVerticalBar 
+                        title="True Positive Rate" 
+                        description="Percentage correctly marked as 'positive'. (Higher is better)"
                         data={chartDataTPR} 
-                        title="True Positive Rate (Recall)" 
-                        description="Who is correctly selected when they should be?"
-                        color1="#3b82f6" color2="#60a5fa" // Blue
+                        colors={["#3b82f6", "#60a5fa"]} // Blue (Opportunity)
                       />
                     </div>
                   </div>
@@ -451,8 +393,6 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
               ) : (
                 // STATE 2: READY TO ANALYZE
                 <>
-                  
-                  
                   {/* DATA PREVIEW TABLE */}
                   {data?.preview && (
                     <Card className="glass-card mt-6">
@@ -551,10 +491,10 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
         </div>
       
         {/* RIGHT COLUMN: Sidebar Tools */}
-        <div className="lg:col-span-4 space-y-6">
+        <div className="lg:col-span-4 space-y-6 hidden lg:block ">
           <Card className="glass-card sticky top-6">
             <CardHeader className="pb-4">
-              <div className="p-2 rounded-xl border border-border bg-gradient-to-br from-sky-100 to-violet-100 inline-flex">
+              <div className="p-2 rounded-xl border border-border bg-transparent from-sky-100 to-violet-100 inline-flex">
                 <Target className="w-4 h-4 text-foreground" />
               </div>
               <CardTitle className="text-lg font-semibold text-foreground mt-2">
