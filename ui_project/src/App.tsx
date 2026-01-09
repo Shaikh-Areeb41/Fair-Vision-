@@ -19,6 +19,7 @@ import { MitigationPage } from "./pages/MitigationPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { toast } from "sonner";
+import { HistoryPage } from "./pages/HistoryPage";
 
 
 type User = {
@@ -255,6 +256,14 @@ function AppContent() {
               element={
                 <PageTransition>
                   <SettingsPage />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <PageTransition>
+                  <HistoryPage />
                 </PageTransition>
               }
             />

@@ -15,6 +15,7 @@ const navItems = [
   { to: "/upload", label: "Datasets" },
   { to: "/analysis", label: "Analysis Results" },
   { to: "/mitigation", label: "Mitigation" },
+  { to: "/history", label: "History" },
 ];
 
 export function TopNav({ userName }: TopNavProps) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom"; // <--- Updated Import
 import {
   BarChart3,
   AlertTriangle,
@@ -18,20 +18,19 @@ import {
   Activity
 } from "lucide-react";
 import { toast } from "sonner";
-import { BiasBarChart } from "../components/Charts/BiasBarChart"; // Adjust path as needed
+
+// Charts
+import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
 import { BiasVerticalBar } from "../components/Charts/BiasVerticalBar";
-// --- INLINE UI COMPONENTS ---
+
+
+// --- INLINE UI COMPONENTS (Button, Badge, Card...) ---
 const Button = ({ className, variant = "default", size = "default", ...props }: any) => {
   const variants: any = {
-    // Keep a strong primary button for CTAs
-    default:
-      "border border-black dark:border-white bg-zinc-900 text-white hover:bg-zinc-800 shadow-soft-sm hover:shadow-soft-lg",
-    // Token-based secondary so it adapts to light/dark
-    secondary:
-      "border border-black dark:border-white bg-card text-foreground hover:bg-muted shadow-soft-sm hover:shadow-soft-lg",
+    default: "border border-black dark:border-white bg-zinc-900 text-white hover:bg-zinc-800 shadow-soft-sm hover:shadow-soft-lg",
+    secondary: "border border-black dark:border-white bg-card text-foreground hover:bg-muted shadow-soft-sm hover:shadow-soft-lg",
     ghost: "border border-black dark:border-white text-muted-foreground hover:bg-muted",
-    outline:
-      "border border-black dark:border-white bg-transparent hover:bg-muted text-foreground hover:shadow-soft-sm"
+    outline: "border border-black dark:border-white bg-transparent hover:bg-muted text-foreground hover:shadow-soft-sm"
   };
   const sizes: any = { default: "h-9 px-4 py-2", sm: "h-8 rounded-md px-3 text-xs", lg: "h-10 rounded-md px-8" };
   return (
@@ -72,7 +71,13 @@ interface DashboardProps {
   analysisData?: { hasBiasAnalysis: boolean };
 }
 
-export function Dashboard({ datasetId, analysisData }: DashboardProps) {
+export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardProps) {
+  // 1. Navigation Logic
+  const location = useLocation();
+  const effectiveDatasetId = location.state?.datasetId || propDatasetId;
+  const datasetId = effectiveDatasetId; // Alias back to 'datasetId' so existing code works!
+
+  // 2. Existing State
   const [data, setData] = useState<any>(null);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [loadingDataset, setLoadingDataset] = useState(false);
@@ -120,22 +125,6 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
     }
   }, [analysisResults]);
 
-  // 2. Run Scan
-  const handleRunScan = async () => {
-    if (!datasetId) return;
-    setScanning(true);
-    try {
-      const response = await axios.post(`http://127.0.0.1:8000/api/analysis/${datasetId}/train`);
-      setAnalysisResults(response.data);
-      toast.success("Bias Scan Complete!");
-    } catch (error: any) {
-      console.error("Scan Error:", error);
-      toast.error(error.response?.data?.detail || "Scan failed.");
-    } finally {
-      setScanning(false);
-    }
-  };
-
   // Helper to determine row count
   const getRowCount = () => {
     if (!data) return null;
@@ -155,7 +144,6 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
     { name: "Unprivileged", rate: (analysisResults.unprivileged_rate * 100).toFixed(1) }
   ] : [];
 
-  // --- EXISTING CHARTS ---
   // Chart A: False Positive Rate (FPR)
   const chartDataFPR = analysisResults ? [
     { name: "Privileged", rate: ((analysisResults.privileged_fpr || 0) * 100).toFixed(1) },
@@ -173,29 +161,6 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
     { name: "Privileged", rate: ((analysisResults.privileged_accuracy || 0) * 100).toFixed(1) },
     { name: "Unprivileged", rate: ((analysisResults.unprivileged_accuracy || 0) * 100).toFixed(1) }
   ] : [];
-
-  // --- NEW CHARTS (DERIVED/ADDITIONAL) ---
-  
-  // Chart D: False Negative Rate (FNR) - "Missed Opportunities"
-  // FNR = 1 - TPR
-  const chartDataFNR = analysisResults ? [
-    { name: "Privileged", rate: ((1 - (analysisResults.privileged_tpr || 0)) * 100).toFixed(1) },
-    { name: "Unprivileged", rate: ((1 - (analysisResults.unprivileged_tpr || 0)) * 100).toFixed(1) }
-  ] : [];
-
-  // Chart E: Specificity (TNR) - "Correct Rejections"
-  // TNR = 1 - FPR
-  const chartDataTNR = analysisResults ? [
-    { name: "Privileged", rate: ((1 - (analysisResults.privileged_fpr || 0)) * 100).toFixed(1) },
-    { name: "Unprivileged", rate: ((1 - (analysisResults.unprivileged_fpr || 0)) * 100).toFixed(1) }
-  ] : [];
-
-  // Chart F: Precision - "Prediction Trustworthiness"
-  const chartDataPrecision = analysisResults ? [
-    { name: "Privileged", rate: ((analysisResults.privileged_precision || 0) * 100).toFixed(1) },
-    { name: "Unprivileged", rate: ((analysisResults.unprivileged_precision || 0) * 100).toFixed(1) }
-  ] : [];
-
 
   // 4. Metrics Cards Configuration
   const metrics = analysisResults ? [
@@ -229,7 +194,6 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
     },
   ] : [];
 
-  // Sidebar actions gating: enable after analysis completes (from local state or session/app)
   const hasBiasAnalysisFlag = (() => {
     try { return sessionStorage.getItem("hasBiasAnalysis") === "true"; } catch { return false; }
   })();
@@ -348,7 +312,7 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
                     />
                   </div>
 
-                  {/* 3. Detailed Analysis Grid (SIMPLIFIED) */}
+                  {/* 3. Detailed Analysis Grid (SIMPLIFIED VERTICAL BARS) */}
                   <div>
                       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-muted-foreground" /> Detailed Performance Analysis
@@ -371,7 +335,7 @@ export function Dashboard({ datasetId, analysisData }: DashboardProps) {
                         colors={["#f59e0b", "#fbbf24"]} // Amber (Risk)
                       />
 
-                      {/* Chart C: TPR -> Vertical Bar Chart (Kept the same) */}
+                      {/* Chart C: TPR -> Vertical Bar Chart */}
                       <BiasVerticalBar 
                         title="True Positive Rate" 
                         description="Percentage correctly marked as 'positive'. (Higher is better)"

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
-import { Settings, ArrowRight, Loader2, X, Info } from "lucide-react";
+import { Settings, ArrowRight, Loader2, X, Info, FileText } from "lucide-react";
 import { toast } from "sonner";
 
 interface ConfigurationStepProps {
@@ -20,6 +20,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
   const [validationError, setValidationError] = useState<string>("");
 
   // Form State
+  const [datasetName, setDatasetName] = useState(""); // <--- NEW STATE
   const [targetColumn, setTargetColumn] = useState("");
   const [sensitiveAttribute, setSensitiveAttribute] = useState("");
   const [privilegedGroup, setPrivilegedGroup] = useState("");
@@ -28,9 +29,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
   // Helper to get unique values from preview for hints
   const getUniqueValues = (colName: string) => {
     if (!colName || !previewData.length) return [];
-    // Convert to string to handle numbers safely
     const values = new Set(previewData.map(row => String(row[colName] ?? "")));
-    // Remove empty values and return top 5
     return Array.from(values).filter(v => v !== "").slice(0, 20); 
   };
 
@@ -40,11 +39,14 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         setLoading(true);
         try {
           const response = await axios.get(`http://127.0.0.1:8000/api/datasets/${datasetId}`);
-          // Extract columns
           const colNames = response.data.columns.map((c: any) => c.name);
           setColumns(colNames);
-          // Store preview rows to give hints later
           setPreviewData(response.data.preview || []);
+          
+          // Pre-fill name with filename if empty
+          if (!datasetName && response.data.filename) {
+             setDatasetName(response.data.filename.replace(".csv", ""));
+          }
         } catch (error) {
           toast.error("Failed to load columns");
         } finally {
@@ -57,20 +59,22 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
 
   const handleSave = async () => {
     setValidationError("");
-    setSaving(true); // Show loading immediately, including during validation
+    setSaving(true); 
+    
+    // 1. Basic Validation
     if (!targetColumn || !sensitiveAttribute || !privilegedGroup || !unprivilegedGroup) {
-      toast.error("Please fill in all fields");
+      toast.error("Please fill in all required fields");
       setSaving(false);
       return;
     }
 
-    // Validate that the entered group values exist in the selected sensitive column
+    // 2. Validate Groups against Dataset
     try {
       const resp = await axios.get(`http://127.0.0.1:8000/api/datasets/${datasetId}`);
       const fullData: any[] = resp.data.full_data || [];
 
       if (!Array.isArray(fullData) || fullData.length === 0) {
-        setValidationError("Unable to validate against dataset. Please re-upload or try again.");
+        setValidationError("Unable to validate against dataset. Please re-upload.");
         toast.error("Validation failed: dataset unavailable");
         setSaving(false);
         return;
@@ -99,18 +103,20 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         return;
       }
     } catch (e) {
-      setValidationError("Validation error. Please check your inputs and try again.");
+      setValidationError("Validation error. Please check your inputs.");
       toast.error("Validation error");
       setSaving(false);
       return;
     }
 
+    // 3. Save Configuration with Custom Name
     try {
       await axios.post(`http://127.0.0.1:8000/api/datasets/${datasetId}/configure`, {
         target_column: targetColumn,
         sensitive_attribute: sensitiveAttribute,
         privileged_group: privilegedGroup,
-        unprivileged_group: unprivilegedGroup
+        unprivileged_group: unprivilegedGroup,
+        dataset_name: datasetName // <--- SENDING THE NAME
       });
       
       toast.success("Configuration saved!");
@@ -150,6 +156,26 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
             </div>
           ) : (
             <>
+              {/* --- NEW SECTION: DATASET NAME --- */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-purple-500" />
+                  Analysis Name <span className="text-zinc-400 font-normal">(Optional)</span>
+                </label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Credit Risk Model - Jan 2024" 
+                  className="w-full p-2.5 rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:ring-2 focus:ring-purple-500 focus:outline-none"
+                  value={datasetName}
+                  onChange={(e) => setDatasetName(e.target.value)}
+                />
+                <p className="text-xs text-zinc-500">
+                  Give this analysis a friendly name to find it easily in your History later.
+                </p>
+              </div>
+
+              <div className="h-px bg-zinc-100 dark:bg-zinc-800 my-4" />
+
               {/* --- SECTION 1: COLUMN MAPPING --- */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
@@ -183,13 +209,13 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
                 </div>
               </div>
 
-              {/* --- SECTION 2: GROUP DEFINITION (With Hints!) --- */}
+              {/* --- SECTION 2: GROUP DEFINITION --- */}
               {sensitiveAttribute && (
                 <div className="p-4 bg-purple-50 dark:bg-purple-900/10 rounded-lg border border-purple-100 dark:border-purple-800/50 animate-in slide-in-from-top-2">
                   <div className="flex items-start gap-2 mb-3">
                     <Info className="w-4 h-4 text-purple-600 mt-0.5" />
                     <div className="text-sm text-purple-800 dark:text-purple-300">
-                      <p className="font-medium">Values found in preview (top 5 rows):</p>
+                      <p className="font-medium">Values found in preview:</p>
                       <div className="flex flex-wrap gap-2 mt-1.5">
                         {getUniqueValues(sensitiveAttribute).map(val => (
                           <span key={val} className="px-2 py-0.5 bg-white dark:bg-zinc-800 rounded border border-purple-200 dark:border-purple-700 text-xs font-mono text-zinc-800 dark:text-zinc-200">
@@ -197,9 +223,6 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
                           </span>
                         ))}
                       </div>
-                      <p className="text-xs mt-2 text-zinc-500">
-                        Note: Other values (like "Male") may exist in the full dataset. Please type them manually below if not shown.
-                      </p>
                     </div>
                   </div>
 
