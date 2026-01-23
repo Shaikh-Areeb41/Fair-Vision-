@@ -15,7 +15,10 @@ import {
   Table as TableIcon,
   ChevronDown,
   ChevronUp,
-  Activity
+  Activity,
+  ShieldCheck,
+  TrendingUp
+
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -83,6 +86,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
   const [loadingDataset, setLoadingDataset] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [previewRows, setPreviewRows] = useState(5);
+  const [loading, setLoading] = useState<boolean>(!!effectiveDatasetId && !analysisResults);
 
   // 1. Fetch Dataset Info
   useEffect(() => {
@@ -162,12 +166,37 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
     { name: "Unprivileged", rate: ((analysisResults.unprivileged_accuracy || 0) * 100).toFixed(1) }
   ] : [];
 
-  // 4. Metrics Cards Configuration
+  // 2. Mitigated Data (If available)
+  const formatRate = (val: number) => (val * 100).toFixed(1);
+  const mitigation = data?.mitigation;
+  
+  const mitChartSelection = mitigation ? [
+    { name: "Privileged", rate: (mitigation.privileged_rate * 100).toFixed(1) },
+    { name: "Unprivileged", rate: (mitigation.unprivileged_rate * 100).toFixed(1) }
+  ] : [];
+
+  const mitChartFPR = mitigation ? [
+    { name: "Privileged", rate: ((mitigation.privileged_fpr || 0) * 100).toFixed(1) },
+    { name: "Unprivileged", rate: ((mitigation.unprivileged_fpr || 0) * 100).toFixed(1) }
+  ] : [];
+
+  const mitChartTPR = mitigation ? [
+    { name: "Privileged", rate: ((mitigation.privileged_tpr || 0) * 100).toFixed(1) },
+    { name: "Unprivileged", rate: ((mitigation.unprivileged_tpr || 0) * 100).toFixed(1) }
+  ] : [];
+
+  const mitChartAcc = mitigation ? [
+    { name: "Privileged", rate: ((mitigation.privileged_accuracy || 0) * 100).toFixed(1) },
+    { name: "Unprivileged", rate: ((mitigation.unprivileged_accuracy || 0) * 100).toFixed(1) }
+  ] : [];
+
+
+  // Metrics for Cards
   const metrics = analysisResults ? [
     {
       label: "Demographic Parity (DPD)",
       value: analysisResults.dpd.toFixed(3),
-      delta: analysisResults.dpd > 0.1 ? "Critical Bias" : "Acceptable",
+      delta: analysisResults.dpd > 0.1 ? "Non-Compliant" : "Compliant",
       Icon: AlertTriangle,
       tint: analysisResults.dpd > 0.1 ? "from-rose-800 to-orange-800" : "from-emerald-800 to-green-800",
     },
@@ -200,13 +229,13 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
   const canProceed = !!analysisResults || analysisData?.hasBiasAnalysis || hasBiasAnalysisFlag;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
+<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
       <div className="flex flex-col gap-2 mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight ">
-          Bias Overview Dashboard
+          Compliance Oversight Dashboard
         </h1>
         <p className="text-muted-foreground">
-          Visualize bias metrics and prepare for mitigation.
+          Monitor regulatory compliance, detect algorithmic bias, and audit fairness metrics.
         </p>
       </div>
 
@@ -272,13 +301,13 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                 </CardContent>
               </Card>
 
-              {/* LOGIC SPLIT: Analysis Results vs Ready State */}
+              {/* STATE 3: ANALYSIS RESULTS (Graphs) */}
               {analysisResults ? (
                 // STATE 3: ANALYSIS COMPLETE
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   
-                  {/* 1. Metrics Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {metrics.map(({ label, value, delta, Icon, tint }) => (
                       <Card key={label} className="glass-card hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
@@ -292,7 +321,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         <CardContent>
                           <div className="flex flex-col">
                             <span className="text-2xl font-bold text-foreground">{value}</span>
-                            <span className={`text-xs mt-1 ${String(delta).includes("Bias") || String(delta).includes("Adverse") ? "text-red-500 font-medium" : "text-muted-foreground"}`}>
+                            <span className={`text-xs mt-1 ${String(delta).includes("Compliant") && !String(delta).includes("Non") ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}`}>
                               {delta}
                             </span>
                           </div>
@@ -301,61 +330,87 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                     ))}
                   </div>
 
-                  {/* 2. Main Disparity Chart (Selection Rate) */}
-                  <div className="border-l-4 border-l-violet-500 rounded-xl">
+                  {/* Main Disparity Chart */}
+                  <div className="border-l-4 border-l-violet-500 rounded-xl overflow-hidden">
                     <BiasBarChart
-                      title="Selection Rate Disparity"
-                      description="Comparing how often the model selects the Privileged vs. Unprivileged group."
+                      title="Selection Rate Disparity (Initial Audit)"
+                      description="Visualizing group inequality before remediation."
                       data={chartDataSelection}
                       height={250}
                       colors={["#8b5cf6", "#ec4899"]} // Violet/Pink
                     />
                   </div>
 
-                  {/* 3. Detailed Analysis Grid (SIMPLIFIED VERTICAL BARS) */}
+                  {/* Detailed Analysis Grid */}
                   <div>
                       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-muted-foreground" /> Detailed Performance Analysis
+                        <Activity className="w-5 h-5 text-muted-foreground" /> Detailed Compliance Metrics
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      
-                      {/* Chart A: Accuracy -> Vertical Bar Chart */}
-                      <BiasVerticalBar 
-                        title="Accuracy Comparison" 
-                        description="How accurate is the model for each group? (Higher is better)"
-                        data={chartDataAcc} 
-                        colors={["#10b981", "#34d399"]} // Emerald (Good)
-                      />
-
-                      {/* Chart B: FPR -> Vertical Bar Chart */}
-                      <BiasVerticalBar 
-                        title="False Positive Rate" 
-                        description="Percentage incorrectly marked as 'positive'. (Lower is better)"
-                        data={chartDataFPR} 
-                        colors={["#f59e0b", "#fbbf24"]} // Amber (Risk)
-                      />
-
-                      {/* Chart C: TPR -> Vertical Bar Chart */}
-                      <BiasVerticalBar 
-                        title="True Positive Rate" 
-                        description="Percentage correctly marked as 'positive'. (Higher is better)"
-                        data={chartDataTPR} 
-                        colors={["#3b82f6", "#60a5fa"]} // Blue (Opportunity)
-                      />
+                      <BiasVerticalBar title="Accuracy" description="Metric Stability" data={chartDataAcc} colors={["#10b981", "#34d399"]} />
+                      <BiasVerticalBar title="False Positive Risk" description="Error Disparity" data={chartDataFPR} colors={["#f59e0b", "#fbbf24"]} />
+                      <BiasVerticalBar title="True Positive Rate" description="Opportunity Rate" data={chartDataTPR} colors={["#3b82f6", "#60a5fa"]} />
                     </div>
                   </div>
 
-                  {/* CTA */}
+                  {/* Mitigation Results */}
+                  {mitigation && (
+                    <div className="pt-8 border-t border-dashed border-zinc-300 dark:border-zinc-700">
+                      <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+                             <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                          </div>
+                          <div>
+                             <h2 className="text-2xl font-bold text-foreground">Projected Remediation Results</h2>
+                             <p className="text-sm text-muted-foreground">Results simulation using {mitigation.technique}.</p>
+                          </div>
+                      </div>
+
+                    <div className="grid grid-cols-2 gap-4 mb-6">
+                      <Card className="border-l-4 border-l-emerald-500 p-4 flex justify-between items-center">
+                        <div>
+                           <p className="text-xs text-muted-foreground font-bold uppercase">Projected Fairness (DPD)</p>
+                           <p className="text-2xl font-bold text-emerald-600">{mitigation.mitigated_dpd}</p>
+                        </div>
+                        <TrendingUp className="w-8 h-8 text-emerald-200" />
+                      </Card>
+                      <Card className="border-l-4 border-l-blue-500 p-4 flex justify-between items-center">
+                        <div>
+                           <p className="text-xs text-muted-foreground font-bold uppercase">Projected Accuracy</p>
+                           <p className="text-2xl font-bold text-blue-600">{formatRate(mitigation.mitigated_accuracy)}%</p>
+                        </div>
+                        <CheckCircle className="w-8 h-8 text-blue-200" />
+                      </Card>
+                    </div>
+
+                      <div className="border-l-4 border-l-emerald-500 rounded-xl mb-6 overflow-hidden">
+                        <BiasBarChart
+                          title="Simulated Selection Rates"
+                          description="Outcome distribution after applying remediation."
+                          data={mitChartSelection}
+                          height={250}
+                          colors={["#10b981", "#34d399"]} 
+                        />
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <BiasVerticalBar title="New Accuracy" description="Post-remediation" data={mitChartAcc} colors={["#10b981", "#34d399"]} />
+                        <BiasVerticalBar title="New FPR" description="Post-remediation" data={mitChartFPR} colors={["#f59e0b", "#fbbf24"]} />
+                        <BiasVerticalBar title="New TPR" description="Post-remediation" data={mitChartTPR} colors={["#3b82f6", "#60a5fa"]} />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex justify-end pt-4 border-t border-border">
                     <Link to="/mitigation">
                       <Button size="lg" className="bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg">
-                        Proceed to Mitigation <ArrowRight className="ml-2 w-4 h-4" />
+                        Go to Fairness Simulator <ArrowRight className="ml-2 w-4 h-4" />
                       </Button>
                     </Link>
                   </div>
                 </div>
               ) : (
-                // STATE 2: READY TO ANALYZE
+                /* STATE 4: READY TO AUDIT OR LOADING */
                 <>
                   {/* DATA PREVIEW TABLE */}
                   {data?.preview && (
@@ -370,7 +425,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                        <div className="overflow-x-auto pb-4">
+                         <div className="overflow-x-auto pb-4">
                           <div className="rounded-md border border-border">
                             <table className="w-full text-sm text-left">
                               <thead className="text-xs text-muted-foreground uppercase bg-muted">
@@ -419,35 +474,34 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                       </CardContent>
                     </Card>
                   )}
-                  {/* READY TO ANALYZE CARD */}
-                  <Card className="glass-card border-dashed border-2 border-emerald-200 dark:border-emerald-900/30 bg-emerald-50/50 dark:bg-emerald-900/10 mt-6">
-                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="p-4 rounded-full bg-emerald-100 dark:bg-emerald-900/30 mb-4 animate-in zoom-in duration-300">
-                        <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <h3 className="text-xl font-bold text-foreground mb-2">
-                        Ready to Analyze
-                      </h3>
-                      <p className="text-muted-foreground max-w-md mb-6">
-                        Your data is loaded, configured, and ready to analyze. Run the scan to visualize disparities.
-                      </p>
-                      {datasetId ? (
+
+                  {/* VISUAL FEEDBACK LOGIC */}
+                  {loading ? (
+                    // IF LOADING: Show "Retrieving" Skeleton
+                    <Card className="glass-card border-dashed border-2 border-yellow-200 bg-yellow-50/20 mt-6 animate-pulse">
+                      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                         <Loader2 className="w-10 h-10 text-yellow-600 animate-spin mb-4" />
+                         <h3 className="text-xl font-bold text-foreground mb-2">Retrieving Analysis Results...</h3>
+                         <p className="text-muted-foreground max-w-sm">
+                           Synchronizing compliance data from the secure audit engine. Please wait.
+                         </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    // IF NOT LOADING (and no results): Show "Ready to Audit"
+                    <Card className="glass-card border-dashed border-2 border-emerald-200 bg-emerald-50/50 mt-6">
+                      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                        <CheckCircle className="w-8 h-8 text-emerald-600 mb-4" />
+                        <h3 className="text-xl font-bold text-foreground mb-2">Ready to Audit</h3>
+                        <p className="text-muted-foreground mb-6">Data configured and verified. Initialize the audit engine.</p>
                         <Link to="/train">
-                          <Button 
-                            size="lg" 
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all hover:scale-105"
-                          >
-                            <Target className="w-4 h-4 mr-2" />
-                            Run Bias Scan
+                          <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
+                            Run Compliance Audit <ArrowRight className="ml-2 w-4 h-4" />
                           </Button>
                         </Link>
-                      ) : (
-                        <Button size="lg" className="bg-emerald-600 text-white" disabled>
-                          Run Bias Scan
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
+                      </CardContent>
+                    </Card>
+                  )}
                 </>
               )}
             </>
@@ -459,59 +513,19 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
           <Card className="glass-card sticky top-6">
             <CardHeader className="pb-4">
               <div className="p-2 rounded-xl border border-border bg-transparent from-sky-100 to-violet-100 inline-flex">
-                <Target className="w-4 h-4 text-foreground" />
+                <LayoutDashboard className="w-4 h-4 text-foreground" />
               </div>
-              <CardTitle className="text-lg font-semibold text-foreground mt-2">
-                Mitigation Tools
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Run scans, apply techniques, upload data, and compare models.
-              </p>
+              <CardTitle className="text-lg font-semibold text-foreground mt-2">Remediation Tools</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
-              {!canProceed && (
-                <>
-                  {datasetId ? (
-                    <Link to="/train">
-                      <Button 
-                        className="w-full bg-zinc-900 text-white hover:bg-zinc-800"
-                      >
-                        Run Bias Scan
-                      </Button>
-                    </Link>
-                  ) : (
-                    <Button className="w-full bg-zinc-900 text-white" disabled>
-                      Run Bias Scan
-                    </Button>
-                  )}
-                </>
-              )}
-              
-              {canProceed ? (
-                <Link to="/mitigation">
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                  >
-                    Apply Mitigation
-                  </Button>
-                </Link>
-              ) : (
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                  disabled
-                >
-                  Apply Mitigation
-                </Button>
-              )}
+              <Link to="/mitigation">
+                 <Button variant="secondary" className="w-full" disabled={!analysisResults}>Open Fairness Simulator</Button>
+              </Link>
               <Link to="/upload">
-                <Button
-                  variant="secondary"
-                  className="w-full"
-                >
-                  Upload Dataset
-                </Button>
+                <Button variant="secondary" className="w-full">New Dataset Upload</Button>
+              </Link>
+              <Link to="/reports">
+                 <Button variant="ghost" className="w-full" disabled={!analysisResults}>Compliance Reports</Button>
               </Link>
               {canProceed ? (
                 <Link to="/reports">

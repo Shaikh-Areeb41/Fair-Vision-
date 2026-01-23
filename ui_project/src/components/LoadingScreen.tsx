@@ -1,129 +1,103 @@
 import { useEffect, useState } from "react";
-import { Card, CardContent } from "./ui/card";
-import { Progress } from "./ui/progress";
-import { CheckCircle, Loader2, Brain, Search, BarChart3 } from "lucide-react";
+import { Loader2, ShieldCheck, FileSearch, Database, Lock } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface LoadingScreenProps {
-  title: string;
-  subtitle: string;
-  onComplete: () => void;
-  duration?: number;
+  title?: string;
+  subtitle?: string;
+  onComplete?: () => void;
 }
 
-const loadingSteps = [
-  { label: "Uploading files...", icon: Search, duration: 20 },
-  { label: "Validating model structure...", icon: Brain, duration: 30 },
-  { label: "Checking compatibility...", icon: BarChart3, duration: 25 },
-  { label: "Preparing analysis...", icon: CheckCircle, duration: 25 },
-];
-
-export function LoadingScreen({
-  title,
-  subtitle,
-  onComplete,
-  duration = 4000,
-}: LoadingScreenProps) {
+export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
-  const [currentStep, setCurrentStep] = useState(0);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+  const [step, setStep] = useState(0);
+
+  // Enterprise-grade "Audit" steps
+  const steps = [
+    { text: "Establishing secure environment...", icon: Lock },
+    { text: "Verifying dataset integrity...", icon: Database },
+    { text: "Loading compliance protocols...", icon: ShieldCheck },
+    { text: "Initializing audit engine...", icon: FileSearch },
+  ];
 
   useEffect(() => {
-    const stepDuration = duration / loadingSteps.length;
-    const progressInterval = duration / 100;
-
-    const progressTimer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressTimer);
-          setTimeout(onComplete, 500);
+    // Progress bar animation
+    const timer = setInterval(() => {
+      setProgress((oldProgress) => {
+        if (oldProgress === 100) {
+          clearInterval(timer);
+          setTimeout(() => onComplete && onComplete(), 500); // Slight delay before finishing
           return 100;
         }
-        return prev + 1;
+        
+        // Calculate step based on progress (0-25, 26-50, etc.)
+        const newStep = Math.min(Math.floor((oldProgress + 1) / 25), 3);
+        setStep(newStep);
+        
+        // Randomize speed to look like real processing
+        const diff = Math.random() * 3; 
+        return Math.min(oldProgress + diff, 100);
       });
-    }, progressInterval);
+    }, 40);
 
-    const stepTimer = setInterval(() => {
-      setCurrentStep((prev) => {
-        const next = prev + 1;
-        if (next < loadingSteps.length) {
-          setCompletedSteps((completed) => [...completed, prev]);
-          return next;
-        } else {
-          setCompletedSteps((completed) => [...completed, prev]);
-          clearInterval(stepTimer);
-          return prev;
-        }
-      });
-    }, stepDuration);
+    return () => clearInterval(timer);
+  }, [onComplete]);
 
-    return () => {
-      clearInterval(progressTimer);
-      clearInterval(stepTimer);
-    };
-  }, [duration, onComplete]);
+  const CurrentIcon = steps[step].icon;
 
   return (
-    <div className="min-h-screen bg-[#121212] flex items-center justify-center p-6">
-      <Card className="w-full max-w-md shadow-[0px_4px_12px_rgba(0,0,0,0.5)]">
-        <CardContent className="pt-8 pb-8">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="relative">
-                <Loader2 className="w-12 h-12 text-[#4F9AFF] animate-spin" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-6 h-6 bg-[#4F9AFF] rounded-full opacity-20 animate-pulse" />
-                </div>
-              </div>
-            </div>
-            <h2 className="text-2xl font-bold text-[#FFFFFF] mb-2">{title}</h2>
-            <p className="text-[#B0B0B0]">{subtitle}</p>
-          </div>
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
+      
+      {/* Central Card */}
+      <div className="w-full max-w-md p-8 space-y-8 text-center">
+        
+        {/* Animated Icon */}
+        <div className="relative flex items-center justify-center mx-auto w-24 h-24">
+          <motion.div 
+            className="absolute inset-0 border-4 border-purple-100 dark:border-purple-900 rounded-full"
+            animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
+            transition={{ repeat: Infinity, duration: 2 }}
+          />
+          <motion.div 
+            key={step}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="relative z-10 bg-white dark:bg-zinc-900 p-4 rounded-full shadow-xl border border-purple-100 dark:border-purple-800"
+          >
+            <CurrentIcon className="w-10 h-10 text-purple-600" />
+          </motion.div>
+        </div>
 
-          <div className="space-y-4 mb-6">
-            <div className="flex justify-between text-sm text-[#B0B0B0]">
-              <span>Processing...</span>
-              <span className="text-[#4F9AFF]">{progress}%</span>
-            </div>
-            <Progress value={progress} className="w-full" />
-          </div>
+        {/* Text Status */}
+        <div className="space-y-2">
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            {title || "System Initializing"}
+          </h2>
+          <p className="text-muted-foreground font-medium animate-pulse">
+            {steps[step].text}
+          </p>
+          <p className="text-xs text-muted-foreground/60 uppercase tracking-widest mt-4">
+            GovTech Secure Audit v2.4
+          </p>
+        </div>
 
-          <div className="space-y-3">
-            {loadingSteps.map((step, index) => {
-              const Icon = step.icon;
-              const isCompleted = completedSteps.includes(index);
-              const isCurrent = currentStep === index;
-
-              return (
-                <div
-                  key={index}
-                  className={`flex items-center gap-3 p-2 rounded-lg transition-all duration-300 ${
-                    isCompleted
-                      ? "bg-[#28C76F]/10 text-[#28C76F] border border-[#28C76F]"
-                      : isCurrent
-                      ? "bg-[#4F9AFF]/10 text-[#4F9AFF] border border-[#4F9AFF]"
-                      : "text-[#757575]"
-                  }`}
-                >
-                  {isCompleted ? (
-                    <CheckCircle className="w-4 h-4 text-[#28C76F]" />
-                  ) : isCurrent ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Icon className="w-4 h-4" />
-                  )}
-                  <span className="text-sm">{step.label}</span>
-                </div>
-              );
-            })}
+        {/* Progress Bar */}
+        <div className="space-y-2">
+          <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
+            <motion.div 
+              className="h-full bg-purple-600"
+              initial={{ width: "0%" }}
+              animate={{ width: `${progress}%` }}
+              transition={{ ease: "linear" }}
+            />
           </div>
-
-          <div className="mt-6 text-center">
-            <p className="text-xs text-[#757575]">
-              This may take a few moments depending on your model size
-            </p>
+          <div className="flex justify-between text-xs font-mono text-muted-foreground">
+            <span>Progress</span>
+            <span>{Math.round(progress)}%</span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+
+      </div>
     </div>
   );
 }

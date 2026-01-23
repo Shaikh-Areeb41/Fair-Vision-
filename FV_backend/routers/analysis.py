@@ -5,7 +5,8 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.pipeline import make_pipeline
 from sklearn.metrics import accuracy_score, confusion_matrix
 
 router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
@@ -30,8 +31,42 @@ async def train_and_analyze(dataset_id: str):
 
         # 2. Load & Clean Data
         df = pd.DataFrame(dataset["full_data"])
+        
+        # Basic cleaning: handle missing values
         df.replace("?", np.nan, inplace=True)
         df.dropna(inplace=True)
+
+        # --- HANDLING PRIVILEGED GROUP LOGIC ---
+        
+        # A. Check for Numeric Thresholds (e.g., ">40")
+        if pd.api.types.is_numeric_dtype(df[sensitive_col]):
+            match = re.match(r"([<>]=?)(.*)", str(privileged_val).strip())
+            if match:
+                operator, value_str = match.groups()
+                try:
+                    threshold = float(value_str)
+                    if operator == ">": mask = df[sensitive_col] > threshold
+                    elif operator == ">=": mask = df[sensitive_col] >= threshold
+                    elif operator == "<": mask = df[sensitive_col] < threshold
+                    elif operator == "<=": mask = df[sensitive_col] <= threshold
+                    
+                    df[sensitive_col] = np.where(mask, "Privileged_Group", "Unprivileged_Group")
+                    privileged_val = "Privileged_Group"
+                    print(f"Applied Numeric Split: {sensitive_col} {operator} {threshold}")
+                except ValueError:
+                    pass
+
+        # B. Check for Comma-Separated Lists (e.g., "Bachelors, Masters")
+        elif "," in str(privileged_val):
+            # Clean up the list (remove spaces)
+            target_values = [x.strip() for x in str(privileged_val).split(",")]
+            
+            # Create mask: True if the row's value is in our list
+            mask = df[sensitive_col].astype(str).isin(target_values)
+            
+            df[sensitive_col] = np.where(mask, "Privileged_Group", "Unprivileged_Group")
+            privileged_val = "Privileged_Group"
+            print(f"Applied List Split: {sensitive_col} in {target_values}")
 
         # 3. Encode Data CORRECTLY
         sensitive_mapping = {} 
@@ -56,10 +91,13 @@ async def train_and_analyze(dataset_id: str):
         # Exclude sensitive_col from dummies because we already encoded it
         X = pd.get_dummies(X, columns=[c for c in X.columns if X[c].dtype == 'object' and c != sensitive_col])
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        model = LogisticRegression(max_iter=1000)
+        # --- FIX: USE PIPELINE WITH SCALER ---
+        # This fixes the "ConvergenceWarning" by normalizing data before training
+        model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, solver='lbfgs'))
         model.fit(X_train, y_train)
+        
         y_pred = model.predict(X_test)
 
         # 5. Calculate Standard Metrics
@@ -72,7 +110,7 @@ async def train_and_analyze(dataset_id: str):
         
         priv_code = sensitive_mapping.get('priv')
         
-        # Initialize default values in case group not found
+        # Initialize default values
         tpr_priv, fpr_priv, sr_priv, acc_priv, prec_priv = 0, 0, 0, 0, 0
         tpr_unpriv, fpr_unpriv, sr_unpriv, acc_unpriv, prec_unpriv = 0, 0, 0, 0, 0
         dpd, fprd, eod, di = 0, 0, 0, 0
@@ -82,7 +120,7 @@ async def train_and_analyze(dataset_id: str):
             priv_group = test_df[test_df[sensitive_col] == priv_code]
             unpriv_group = test_df[test_df[sensitive_col] != priv_code]
 
-            # --- UPDATED HELPER FUNCTION ---
+            # --- METRICS HELPER FUNCTION ---
             def get_metrics(group):
                 if len(group) == 0: return 0, 0, 0, 0, 0
                 
@@ -90,10 +128,8 @@ async def train_and_analyze(dataset_id: str):
                 
                 # Handle edge case where CM is smaller than 2x2
                 if cm.shape != (2, 2): 
-                    # Attempt to pad if possible, or return 0
                     tn, fp, fn, tp = 0, 0, 0, 0
                     if cm.shape == (1, 1):
-                        # Very simplified fallback for tiny samples
                         if group['actual'].iloc[0] == 0: tn = cm[0,0]
                         else: tp = cm[0,0]
                 else:
@@ -104,9 +140,9 @@ async def train_and_analyze(dataset_id: str):
                 # Calculations
                 tpr = tp / (tp + fn) if (tp + fn) > 0 else 0  # Recall
                 fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
-                sr = (tp + fp) / total if total > 0 else 0
+                sr = (tp + fp) / total if total > 0 else 0      # Selection Rate
                 
-                # NEW METRICS ADDED HERE
+                # NEW METRICS
                 acc = (tp + tn) / total if total > 0 else 0
                 prec = tp / (tp + fp) if (tp + fp) > 0 else 0
                 
@@ -129,11 +165,11 @@ async def train_and_analyze(dataset_id: str):
             "eod": round(eod, 4),
             "di": round(di, 4),
             
-            # --- OLD KEYS (Keep for backward compatibility) ---
+            # --- OLD KEYS (Backward compatibility) ---
             "privileged_rate": round(sr_priv, 4),
             "unprivileged_rate": round(sr_unpriv, 4),
             
-            # --- NEW KEYS (REQUIRED FOR CHARTS) ---
+            # --- NEW KEYS (For Charts) ---
             "privileged_accuracy": round(acc_priv, 4),
             "unprivileged_accuracy": round(acc_unpriv, 4),
             

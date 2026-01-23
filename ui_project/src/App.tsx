@@ -135,17 +135,18 @@ function AppContent() {
 
   const handleTrainingComplete = (modelType: string) => {
     updateState({ trainedModel: modelType });
-    navigate("/analysis");
+    navigate("/dashboard"); 
+    toast.success("Audit complete. Results loaded.");
   };
 
   const handleBiasAnalysisComplete = () => {
-    updateState({
-      analysisData: {
-        hasBiasAnalysis: true,
-        hasMitigation: false,
-        metrics: mockBiasMetrics,
-      },
-    });
+    const newAnalysisData = {
+      hasBiasAnalysis: true,
+      hasMitigation: false,
+      metrics: [], 
+    };
+    
+    updateState({ analysisData: newAnalysisData });
     navigate("/dashboard");
     toast.success("Bias analysis completed! Check your dashboard for results.");
   };

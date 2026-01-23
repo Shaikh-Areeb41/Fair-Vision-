@@ -10,12 +10,11 @@ type TopNavProps = {
 };
 
 const navItems = [
-  { to: "/dashboard", label: "Dashboard" },
-  { to: "/reports", label: "Bias Reports" },
-  { to: "/upload", label: "Datasets" },
-  { to: "/analysis", label: "Analysis Results" },
-  { to: "/mitigation", label: "Mitigation" },
-  { to: "/history", label: "History" },
+  { to: "/dashboard", label: "Oversight Dashboard" },
+  { to: "/history", label: "Audit Logs" },            
+  { to: "/upload", label: "New Audit" },              
+  { to: "/reports", label: "Compliance Reports" },    
+  { to: "/mitigation", label: "Fairness Simulator" }, 
 ];
 
 export function TopNav({ userName }: TopNavProps) {

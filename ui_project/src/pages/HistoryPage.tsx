@@ -9,7 +9,10 @@ import {
   Loader2, 
   Search, 
   CheckCircle, 
-  AlertTriangle 
+  AlertTriangle,
+  Trash2,
+  ShieldCheck,
+  ClipboardList // New Icon for Audit
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -25,7 +28,11 @@ interface DatasetRecord {
   bias_status: string;
 }
 
-export function HistoryPage() {
+interface HistoryPageProps {
+  onLoadDataset?: (id: string) => void;
+}
+
+export function HistoryPage({ onLoadDataset }: HistoryPageProps) {
   const navigate = useNavigate();
   const [history, setHistory] = useState<DatasetRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,30 +47,33 @@ export function HistoryPage() {
       const response = await axios.get("http://127.0.0.1:8000/api/datasets/");
       setHistory(response.data);
     } catch (error) {
-      toast.error("Failed to load history.");
+      toast.error("Failed to load audit logs.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleLoadDataset = (record: DatasetRecord) => {
-    // 1. Notify User
-    toast.success(`Loading "${record.name}"...`);
-    
-    // 2. Clear previous session data to avoid conflicts
+    toast.success(`Loading Audit "${record.name}"...`);
+    if (onLoadDataset) onLoadDataset(record.id);
     sessionStorage.removeItem("analysisResults");
     sessionStorage.removeItem("hasBiasAnalysis");
-    
-    // 3. Navigate to Dashboard with the ID
-    // The Dashboard component will detect this ID and fetch the data automatically
     navigate("/dashboard", { state: { datasetId: record.id } });
-    
-    // Fallback: If your Dashboard uses props, we might need to pass it via App state, 
-    // but the Route navigation state is the cleanest way to "refresh" the view.
-    // For now, let's also trigger a page reload logic if needed, but navigate is best.
   };
 
-  // Filter logic
+  const handleDeleteDataset = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    if (!window.confirm(`Delete record "${name}"? This will remove it from the audit trail.`)) return;
+
+    try {
+        await axios.delete(`http://127.0.0.1:8000/api/datasets/${id}`);
+        setHistory(prev => prev.filter(item => item.id !== id));
+        toast.success("Record removed from logs");
+    } catch (error) {
+        toast.error("Failed to delete record");
+    }
+  };
+
   const filteredHistory = history.filter(item => 
     item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     item.filename.toLowerCase().includes(searchTerm.toLowerCase())
@@ -76,20 +86,19 @@ export function HistoryPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <History className="w-8 h-8 text-purple-600" />
-            Analysis History
+            <ClipboardList className="w-8 h-8 text-purple-600" />
+            Audit Logs
           </h1>
           <p className="text-muted-foreground mt-1">
-            Access and manage your previous bias scans.
+            Review historical compliance checks and dataset audits.
           </p>
         </div>
         
-        {/* Search Bar */}
         <div className="relative w-full md:w-96">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder="Search analysis..."
+            placeholder="Search audit records..."
             className="w-full bg-background border border-input rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -101,10 +110,10 @@ export function HistoryPage() {
       <Card className="glass-card border-none shadow-soft">
         <CardHeader className="border-b border-border bg-muted/20">
           <div className="grid grid-cols-12 text-xs font-semibold uppercase text-muted-foreground px-2">
-            <div className="col-span-4 pl-2">Analysis Name</div>
-            <div className="col-span-3">Date</div>
-            <div className="col-span-2">Status</div>
-            <div className="col-span-2">Bias Found</div>
+            <div className="col-span-4 pl-2">Audit Session Name</div>
+            <div className="col-span-3">Timestamp</div>
+            <div className="col-span-2">State</div>
+            <div className="col-span-2">Compliance Status</div>
             <div className="col-span-1 text-right">Action</div>
           </div>
         </CardHeader>
@@ -115,7 +124,7 @@ export function HistoryPage() {
             </div>
           ) : filteredHistory.length === 0 ? (
             <div className="p-12 text-center text-muted-foreground">
-              No analysis history found. Upload a dataset to get started.
+              No audit records found. Start a new audit to generate logs.
             </div>
           ) : (
             <div className="divide-y divide-border">
@@ -137,36 +146,44 @@ export function HistoryPage() {
                     </div>
                   </div>
 
-                  {/* Date Column */}
                   <div className="col-span-3 flex items-center gap-2 text-sm text-muted-foreground">
                     <Calendar className="w-3.5 h-3.5" />
-                    {new Date(item.date).toLocaleDateString()}
+                    {new Date(item.date).toLocaleDateString()} <span className="text-xs opacity-50">{new Date(item.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                   </div>
 
-                  {/* Status Column */}
                   <div className="col-span-2">
                     <Badge variant={item.status === "Analyzed" ? "default" : "secondary"} className="text-xs">
-                      {item.status}
+                      {item.status === "Analyzed" ? "Audited" : item.status}
                     </Badge>
                   </div>
 
-                  {/* Bias Status Column */}
                   <div className="col-span-2">
-                    {item.bias_status === "Biased" ? (
+                    {item.status === "Mitigated" ? (
+                       <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-500 text-sm font-medium">
+                         <ShieldCheck className="w-3.5 h-3.5" /> Remedied
+                       </div>
+                    ) : item.bias_status === "Biased" ? (
                       <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-500 text-sm font-medium">
-                        <AlertTriangle className="w-3.5 h-3.5" /> Biased
+                        <AlertTriangle className="w-3.5 h-3.5" /> Non-Compliant
                       </div>
                     ) : item.bias_status === "Fair" ? (
                       <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-500 text-sm font-medium">
-                        <CheckCircle className="w-3.5 h-3.5" /> Fair
+                        <CheckCircle className="w-3.5 h-3.5" /> Compliant
                       </div>
                     ) : (
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
                   </div>
 
-                  {/* Action Column */}
-                  <div className="col-span-1 flex justify-end">
+                  <div className="col-span-1 flex justify-end gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      onClick={(e) => handleDeleteDataset(e, item.id, item.name)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                     <Button 
                       size="sm" 
                       variant="ghost" 
