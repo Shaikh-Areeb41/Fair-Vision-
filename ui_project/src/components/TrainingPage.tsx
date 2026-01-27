@@ -41,7 +41,7 @@ export function TrainingPage({ datasetId: propId, onTrainingComplete }: Training
       const modelType = selectedModel === "logistic" ? "logistic" : "random_forest";
       
       // 1. Call API and CAPTURE the response
-      const response = await axios.post(`http://127.0.0.1:8000/api/analysis/${activeId}/train`, {
+      const response = await axios.post(` /analysis/${activeId}/train`, {
         model_type: modelType
       });
 

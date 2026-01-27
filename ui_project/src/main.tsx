@@ -5,7 +5,10 @@ import { Toaster } from "./components/ui/sonner";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./components/ThemeProvider";
 import "./styles/index.css";
+import axios from 'axios';
 
+// This sets the "Base URL" for the entire app automatically
+axios.defaults.baseURL = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

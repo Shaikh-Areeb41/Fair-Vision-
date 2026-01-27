@@ -63,7 +63,7 @@ export function SettingsPage() {
 
         // 2. Call Backend
         const response = await axios.post(
-            "http://127.0.0.1:8000/api/auth/change-password",
+            " /auth/change-password",
             {
                 current_password: currentPassword,
                 new_password: newPassword
