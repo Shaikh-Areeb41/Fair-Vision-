@@ -5,7 +5,8 @@ import { Button } from "./ui/button";
 import { FileUpload } from "./FileUpload";
 import { Database, Brain, ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { ConfigurationStep } from "./ConfigurationStep"; // Import the new Modal
+import { ConfigurationStep } from "./ConfigurationStep";
+import { useNavigate } from "react-router-dom"; // Added for redirect if session invalid
 
 interface BackendResponse {
   id: string;
@@ -18,18 +19,19 @@ interface BackendResponse {
 interface UploadPageProps {
   onUploadComplete: (data: {
     hasModel: boolean;
-    modelFile?: File | null; // Changed to accept null
-    datasetFile?: File | null; // Changed to accept null
+    modelFile?: File | null;
+    datasetFile?: File | null;
     datasetId?: string;
   }) => void;
 }
 
 export function UploadPage({ onUploadComplete }: UploadPageProps) {
+  const navigate = useNavigate();
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [datasetFile, setDatasetFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   
-  // NEW: State for Configuration Modal
+  // State for Configuration Modal
   const [showConfig, setShowConfig] = useState(false);
   const [uploadedDatasetId, setUploadedDatasetId] = useState<string>("");
 
@@ -43,22 +45,39 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
     let tempId = ""; 
 
     try {
-      // 1. Upload Dataset
+      // 1. Get Token from Storage
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Session expired. Please log in again.");
+        navigate("/login");
+        return;
+      }
+
+      // 2. Upload Dataset with Auth Header
       const datasetFormData = new FormData();
       datasetFormData.append("file", datasetFile);
 
       const datasetResponse = await axios.post<BackendResponse>(
         "http://127.0.0.1:8000/api/datasets/upload",
         datasetFormData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { 
+          headers: { 
+            "Content-Type": "multipart/form-data",
+            "Authorization": `Bearer ${token}` // <--- CRITICAL FIX
+          } 
+        }
       );
 
       console.log("Dataset Uploaded:", datasetResponse.data);
       tempId = datasetResponse.data.id;
-      setUploadedDatasetId(tempId); // Save ID for the modal
+      
+      // Save ID to storage so other pages can find it
+      localStorage.setItem("activeDatasetId", tempId);
+      setUploadedDatasetId(tempId);
+      
       toast.success("Dataset saved successfully!");
 
-      // 2. Upload Model (Optional)
+      // 3. Upload Model (Optional)
       if (modelFile) {
         toast.info("Uploading Model...");
         const modelFormData = new FormData();
@@ -67,33 +86,43 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
         await axios.post<BackendResponse>(
           "http://127.0.0.1:8000/api/models/upload",
           modelFormData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          { 
+            headers: { 
+              "Content-Type": "multipart/form-data",
+              "Authorization": `Bearer ${token}` // <--- CRITICAL FIX
+            } 
+          }
         );
         toast.success("Model saved successfully!");
       }
 
-      // 3. Stop loading and OPEN MODAL instead of navigating
+      // 4. Open Configuration Modal
       setIsUploading(false);
       setShowConfig(true); 
 
     } catch (error: any) {
       setIsUploading(false);
       console.error("Upload Error:", error);
-      const errorMessage = error.response?.data?.detail || "Failed to connect to backend.";
-      toast.error(errorMessage);
+      
+      if (error.response?.status === 401) {
+          toast.error("Session invalid. Please log in again.");
+          navigate("/login");
+      } else {
+          const errorMessage = error.response?.data?.detail || "Failed to connect to backend.";
+          toast.error(errorMessage);
+      }
     }
   };
 
-  // Called when Configuration Modal hits "Save & Next" or "Skip"
   const handleConfigComplete = () => {
     setShowConfig(false);
     
-    // TRIGGER THE FINAL NAVIGATION TO DASHBOARD
+    // Trigger final navigation
     const hasModel = modelFile !== null;
     onUploadComplete({
       hasModel,
-      modelFile: modelFile, // Now compatible (File | null)
-      datasetFile: datasetFile, // Now compatible (File | null)
+      modelFile: modelFile,
+      datasetFile: datasetFile,
       datasetId: uploadedDatasetId,
     });
   };
@@ -101,12 +130,12 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
   return (
     <div className="p-6 max-w-4xl mx-auto min-h-screen">
       
-      {/* RENDER THE CONFIGURATION MODAL */}
+      {/* Configuration Modal */}
       <ConfigurationStep 
         isOpen={showConfig}
         datasetId={uploadedDatasetId}
         onComplete={handleConfigComplete}
-        onCancel={() => handleConfigComplete()} // Allows skipping config if user cancels
+        onCancel={() => handleConfigComplete()}
       />
 
       <div className="mb-8">
@@ -114,13 +143,12 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
           Upload Your Data
         </h1>
         <p className="text-muted-foreground">
-          Upload your dataset and optionally your trained ML model to begin bias
-          analysis
+          Upload your dataset and optionally your trained ML model to begin bias analysis.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Dataset Upload - Required */}
+        {/* Dataset Upload */}
         <Card className="glass-card">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -142,7 +170,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
           </CardContent>
         </Card>
 
-        {/* Model Upload - Optional */}
+        {/* Model Upload */}
         <Card className="glass-card">
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -165,6 +193,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
         </Card>
       </div>
 
+      {/* Summary Card */}
       {(datasetFile || modelFile) && (
         <Card className="mb-6 glass-card">
           <CardHeader>
@@ -199,6 +228,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
         </Card>
       )}
 
+      {/* Action Bar */}
       <Card className="glass-card">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">

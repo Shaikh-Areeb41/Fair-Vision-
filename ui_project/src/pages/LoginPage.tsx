@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-import { Shield, Eye, EyeOff, Mail, Lock, Github } from "lucide-react";
+import { useAuth } from "../context/AuthContext"; 
+import { useNavigate } from "react-router-dom"; 
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
+import { Shield, Eye, EyeOff, Mail, Lock, Github, Loader2 } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { toast } from "sonner";
+import axios from "axios"; // <--- ADDED: Necessary for direct API call
 
-interface LoginPageProps {
-  onLogin: (userData: { name: string; email: string }) => void;
-}
+export function LoginPage() {
+  const { login, register } = useAuth(); 
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
-export function LoginPage({ onLogin }: LoginPageProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
@@ -22,19 +25,47 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     confirmPassword: "",
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginData.email || !loginData.password) {
       toast.error("Please fill in all fields");
       return;
     }
 
-    // Mock login
-    onLogin({ name: "John Doe", email: loginData.email });
-    toast.success("Welcome back to FairVision!");
+    setLoading(true);
+    try {
+      // 1. Direct Backend Call to capture the Token
+      const response = await axios.post("http://127.0.0.1:8000/api/auth/login", {
+        email: loginData.email,
+        password: loginData.password,
+      });
+
+      // 2. Extract Token
+      const { access_token, user } = response.data;
+
+      if (!access_token) {
+        throw new Error("No access token received.");
+      }
+
+      // 3. CRITICAL: Save Token to Storage (Fixes Settings Page issue)
+      localStorage.setItem("access_token", access_token);
+      
+      // 4. Update Context State
+      await login(loginData.email, loginData.password);
+      
+      toast.success("Welcome back!");
+      navigate("/dashboard"); 
+
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      const msg = err.response?.data?.detail || "Invalid credentials";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerData.name || !registerData.email || !registerData.password) {
       toast.error("Please fill in all fields");
@@ -46,9 +77,18 @@ export function LoginPage({ onLogin }: LoginPageProps) {
       return;
     }
 
-    // Mock registration
-    onLogin({ name: registerData.name, email: registerData.email });
-    toast.success("Account created successfully! Welcome to FairVision!");
+    setLoading(true);
+    try {
+      await register(registerData.email, registerData.password, registerData.name);
+      toast.success("Account created! Please sign in.");
+      // Switch tab to login or navigate
+      navigate("/upload"); 
+    } catch (err) {
+      // Error handled in Context usually, but safety log here
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -59,7 +99,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
         <ThemeToggle />
       </div>
 
-      <div className="relative z-10 flex items-center justify-center p-6">
+      <div className="relative z-10 flex items-center justify-center p-6 min-h-screen">
         <div className="w-full max-w-md">
           {/* Brand */}
           <div className="text-center mb-8">
@@ -75,22 +115,22 @@ export function LoginPage({ onLogin }: LoginPageProps) {
           </div>
 
           {/* Auth Card */}
-          <Card className="glass-card rounded-2xl">
+          <Card className="glass-card rounded-2xl shadow-xl border-zinc-200 dark:border-zinc-800">
             <CardHeader>
               <CardTitle className="text-center text-2xl text-zinc-900 dark:text-zinc-100">Welcome</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6 glass-plate p-1 rounded-lg">
+                <TabsList className="grid w-full grid-cols-2 mb-6 glass-plate p-1 rounded-lg bg-zinc-100 dark:bg-zinc-900">
                   <TabsTrigger
                     value="login"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-900/70 dark:data-[state=active]:text-zinc-100 transition-colors"
+                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-zinc-100 transition-colors"
                   >
                     Sign In
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-900/70 dark:data-[state=active]:text-zinc-100 transition-colors"
+                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-zinc-100 transition-colors"
                   >
                     Sign Up
                   </TabsTrigger>
@@ -103,14 +143,14 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     onClick={() => toast.info("Google sign-in coming soon")}
                     className="w-full border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-900/70 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/70"
                   >
-                    <Mail className="w-4 h-4 mr-2" /> Continue with Email
+                    <Mail className="w-4 h-4 mr-2" /> Google
                   </Button>
                   <Button
                     type="button"
                     onClick={() => toast.info("GitHub sign-in coming soon")}
                     className="w-full border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-900/70 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/70"
                   >
-                    <Github className="w-4 h-4 mr-2" /> Continue with GitHub
+                    <Github className="w-4 h-4 mr-2" /> GitHub
                   </Button>
                 </div>
                 <div className="relative mb-5">
@@ -118,78 +158,65 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                     <span className="w-full border-t border-zinc-200 dark:border-zinc-700/60" />
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="bg-transparent px-2 text-zinc-500 dark:text-zinc-500">or continue with</span>
+                    <span className="bg-white dark:bg-zinc-950 px-2 text-zinc-500">or continue with</span>
                   </div>
                 </div>
 
                 <TabsContent value="login">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="login-email" className="text-zinc-700 dark:text-zinc-300">Email</Label>
+                      <Label htmlFor="login-email">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                         <Input
                           id="login-email"
                           type="email"
                           placeholder="you@company.com"
-                          className="pl-9 bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                          className="pl-9"
                           value={loginData.email}
                           onChange={(e) =>
-                            setLoginData((prev) => ({
-                              ...prev,
-                              email: e.target.value,
-                            }))
+                            setLoginData((prev) => ({ ...prev, email: e.target.value }))
                           }
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="login-password" className="text-zinc-700 dark:text-zinc-300">Password</Label>
+                      <Label htmlFor="login-password">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
                         <Input
                           id="login-password"
                           type={showPassword ? "text" : "password"}
                           placeholder="Your password"
-                          className="pl-9 pr-10 bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
+                          className="pl-9 pr-10"
                           value={loginData.password}
                           onChange={(e) =>
-                            setLoginData((prev) => ({
-                              ...prev,
-                              password: e.target.value,
-                            }))
+                            setLoginData((prev) => ({ ...prev, password: e.target.value }))
                           }
                         />
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon"
-                          className="absolute right-1 top-1 h-8 w-8 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+                          className="absolute right-1 top-1 h-8 w-8 text-zinc-500"
                           onClick={() => setShowPassword(!showPassword)}
                         >
-                          {showPassword ? (
-                            <EyeOff className="h-4 w-4" />
-                          ) : (
-                            <Eye className="h-4 w-4" />
-                          )}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
                       <label className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 select-none">
-                        <input type="checkbox" className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700/60" />
+                        <input type="checkbox" className="h-4 w-4 rounded border-zinc-300" />
                         Remember me
                       </label>
-                      <a className="text-sky-600 dark:text-sky-400 hover:underline cursor-pointer">Forgot password?</a>
+                      <a href="#" className="text-sky-600 dark:text-sky-400 hover:underline">Forgot password?</a>
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-sky-600 hover:bg-sky-700 text-white"
-                      size="lg"
-                    >
+                    <Button type="submit" className="w-full bg-zinc-900 text-white hover:bg-zinc-800" size="lg" disabled={loading}>
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                       Sign In
                     </Button>
                   </form>
@@ -198,78 +225,51 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                 <TabsContent value="register">
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="register-name" className="text-zinc-700 dark:text-zinc-300">Full Name</Label>
+                      <Label htmlFor="register-name">Full Name</Label>
                       <Input
                         id="register-name"
                         type="text"
                         placeholder="Ada Lovelace"
-                        className="bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
                         value={registerData.name}
-                        onChange={(e) =>
-                          setRegisterData((prev) => ({
-                            ...prev,
-                            name: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => setRegisterData((prev) => ({ ...prev, name: e.target.value }))}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="register-email" className="text-zinc-700 dark:text-zinc-300">Email</Label>
+                      <Label htmlFor="register-email">Email</Label>
                       <Input
                         id="register-email"
                         type="email"
                         placeholder="you@company.com"
-                        className="bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
                         value={registerData.email}
-                        onChange={(e) =>
-                          setRegisterData((prev) => ({
-                            ...prev,
-                            email: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => setRegisterData((prev) => ({ ...prev, email: e.target.value }))}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="register-password" className="text-zinc-700 dark:text-zinc-300">Password</Label>
+                      <Label htmlFor="register-password">Password</Label>
                       <Input
                         id="register-password"
                         type="password"
                         placeholder="Create a password"
-                        className="bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
                         value={registerData.password}
-                        onChange={(e) =>
-                          setRegisterData((prev) => ({
-                            ...prev,
-                            password: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => setRegisterData((prev) => ({ ...prev, password: e.target.value }))}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="register-confirm" className="text-zinc-700 dark:text-zinc-300">Confirm Password</Label>
+                      <Label htmlFor="register-confirm">Confirm Password</Label>
                       <Input
                         id="register-confirm"
                         type="password"
                         placeholder="Confirm your password"
-                        className="bg-white dark:bg-zinc-900/70 border-zinc-200 dark:border-zinc-700/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-400"
                         value={registerData.confirmPassword}
-                        onChange={(e) =>
-                          setRegisterData((prev) => ({
-                            ...prev,
-                            confirmPassword: e.target.value,
-                          }))
-                        }
+                        onChange={(e) => setRegisterData((prev) => ({ ...prev, confirmPassword: e.target.value }))}
                       />
                     </div>
 
-                    <Button
-                      type="submit"
-                      className="w-full bg-sky-600 hover:bg-sky-700 text-white"
-                      size="lg"
-                    >
+                    <Button type="submit" className="w-full bg-zinc-900 text-white hover:bg-zinc-800" size="lg" disabled={loading}>
+                      {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                       Create Account
                     </Button>
                   </form>
@@ -278,7 +278,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </CardContent>
           </Card>
 
-          <p className="text-center text-sm text-zinc-500 dark:text-zinc-500 mt-6">
+          <p className="text-center text-sm text-zinc-500 mt-6">
             By signing up, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>

@@ -2,22 +2,18 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Scale, ArrowRight, CheckCircle, Loader2, RefreshCw, ShieldCheck, Sliders
+  Scale, ArrowRight, CheckCircle, Loader2, RefreshCw, Sliders, ArrowLeft
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { DecisionPoint } from "../components/DecisionPoint";
-import { ArrowLeft, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import { BiasBarChart } from "../components/Charts/BiasBarChart";
+import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
 
 interface MitigationPageProps {
-  selectedMitigation?: string;
-  onSelect: (technique: string) => void;
-  onApply: () => void;
+  onApply?: () => void;
 }
 
-export function MitigationPage({ selectedMitigation, onSelect, onApply }: MitigationPageProps) {
+export function MitigationPage({ onApply }: MitigationPageProps) {
   const navigate = useNavigate();
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const [originalData, setOriginalData] = useState<any>(null);
@@ -25,7 +21,7 @@ export function MitigationPage({ selectedMitigation, onSelect, onApply }: Mitiga
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const id = localStorage.getItem("activeDatasetId");
+    const id = localStorage.getItem("activeDatasetId") || sessionStorage.getItem("activeDatasetId");
     if (id) {
       setDatasetId(id);
       fetchData(id);
@@ -34,10 +30,16 @@ export function MitigationPage({ selectedMitigation, onSelect, onApply }: Mitiga
 
   const fetchData = async (id: string) => {
     try {
-      const res = await axios.get(`http://127.0.0.1:8000/api/datasets/${id}`);
+      const token = localStorage.getItem("access_token");
+      const res = await axios.get(`http://127.0.0.1:8000/api/datasets/${id}`, {
+         headers: { Authorization: `Bearer ${token}` }
+      });
+      
       if (res.data?.analysis) setOriginalData(res.data.analysis);
       if (res.data?.mitigation) setMitigatedData(res.data.mitigation);
+      
     } catch (e) {
+      console.error(e);
       toast.error("Could not load analysis data.");
     }
   };
@@ -46,15 +48,41 @@ export function MitigationPage({ selectedMitigation, onSelect, onApply }: Mitiga
     if (!datasetId) return;
     setLoading(true);
     try {
-      const response = await axios.post(`http://127.0.0.1:8000/api/mitigation/${datasetId}/apply`);
+      const token = localStorage.getItem("access_token");
+      const response = await axios.post(`http://127.0.0.1:8000/api/mitigation/${datasetId}/apply`, {}, {
+         headers: { Authorization: `Bearer ${token}` }
+      });
+      
       setMitigatedData(response.data);
-      toast.success("Simulation complete. Results saved.");
+      
+      // Update Dashboard Storage
+      try {
+          const currentDashboard = JSON.parse(localStorage.getItem("dashboardData") || "{}");
+          currentDashboard.mitigation = response.data;
+          localStorage.setItem("dashboardData", JSON.stringify(currentDashboard));
+      } catch (e) { /* Ignore */ }
+
+      toast.success("Mitigation applied successfully.");
       if (onApply) onApply();
+
     } catch (error) {
-      toast.error("Simulation failed. Check system logs.");
+      console.error(error);
+      toast.error("Simulation failed. Check console for details.");
     } finally {
       setLoading(false);
     }
+  };
+
+  // --- HELPER: SAFE NUMBER FORMATTER ---
+  // Prevents "Cannot read properties of undefined"
+  const safeFormat = (val: any, decimals: number = 1, multiplier: number = 100) => {
+    if (val === undefined || val === null) return "0.0";
+    return (val * multiplier).toFixed(decimals);
+  };
+
+  const safeFixed = (val: any, decimals: number = 3) => {
+      if (val === undefined || val === null) return "-";
+      return Number(val).toFixed(decimals);
   };
 
   if (!datasetId) {
@@ -69,10 +97,10 @@ export function MitigationPage({ selectedMitigation, onSelect, onApply }: Mitiga
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="p-6 max-w-5xl mx-auto min-h-screen animate-in fade-in duration-500">
+      <div className="flex items-center gap-4 mb-8">
         <Link to="/dashboard">
-          <Button variant="outline">
+          <Button variant="outline" size="sm">
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard
           </Button>
@@ -83,138 +111,144 @@ export function MitigationPage({ selectedMitigation, onSelect, onApply }: Mitiga
             Fairness Simulator
           </h1>
           <p className="text-muted-foreground mt-1">
-            Simulate algorithmic adjustments to visualize potential regulatory compliance.
+            Simulate algorithmic adjustments using threshold optimization.
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        
-        {/* LEFT: Strategy Selection */}
+        {/* LEFT COLUMN */}
         <div className="lg:col-span-4 space-y-6">
           <Card className="glass-card border-purple-200 dark:border-purple-800">
             <CardHeader>
-              <CardTitle>Remediation Strategy</CardTitle>
-              <CardDescription>Recommended technique based on audit metrics.</CardDescription>
+              <CardTitle>Recommended Strategy</CardTitle>
+              <CardDescription>Based on your analysis results.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-4 border-2 border-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-xl cursor-pointer relative overflow-hidden">
-                <div className="absolute top-0 right-0 bg-purple-600 text-white text-xs px-2 py-1 rounded-bl-lg font-medium">
-                  Compliance Standard
-                </div>
+              <div className="p-4 border-2 border-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-xl cursor-pointer relative overflow-hidden transition-all hover:scale-[1.02]">
+                <div className="absolute top-0 right-0 bg-purple-600 text-white text-xs px-2 py-1 rounded-bl-lg font-medium">Best Fit</div>
                 <h3 className="font-bold text-purple-900 dark:text-purple-100 flex items-center gap-2">
-                  <RefreshCw className="w-4 h-4" /> Reweighing
+                  <RefreshCw className="w-4 h-4" /> Threshold Optimizer
                 </h3>
-                <p className="text-sm text-purple-800 dark:text-purple-200 mt-1">
-                  Adjusts sample weights to equalize importance of underrepresented groups.
+                <p className="text-sm text-purple-800 dark:text-purple-200 mt-2 leading-relaxed">
+                  Adjusts the acceptance threshold for unprivileged groups to equalize selection rates.
                 </p>
-                <div className="mt-3 flex gap-2 text-xs text-purple-700/70 dark:text-purple-300/70">
-                  <span className="bg-white/50 px-1.5 py-0.5 rounded">Pre-processing</span>
-                  <span className="bg-white/50 px-1.5 py-0.5 rounded">Non-Destructive</span>
-                </div>
               </div>
 
               <div className="mt-6">
                 <Button 
-                  className="w-full bg-zinc-900 text-white hover:bg-zinc-800" 
+                  className="w-full bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg" 
                   size="lg"
                   onClick={handleApplyMitigation}
                   disabled={loading}
                 >
                   {loading ? (
-                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Simulating...</>
+                    <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Optimizing...</>
                   ) : mitigatedData ? (
                     <><RefreshCw className="w-4 h-4 mr-2" /> Re-Run Simulation</>
                   ) : (
-                    <><Scale className="w-4 h-4 mr-2" /> Run Simulation</>
+                    <><Scale className="w-4 h-4 mr-2" /> Apply Mitigation</>
                   )}
                 </Button>
-                {mitigatedData && (
-                   <p className="text-xs text-center text-muted-foreground mt-2">
-                     Simulation active. <br/> Results appended to audit log.
-                   </p>
-                )}
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* RIGHT: Results Comparison */}
+        {/* RIGHT COLUMN */}
         <div className="lg:col-span-8">
           {!mitigatedData ? (
-             <div className="h-full flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-xl bg-muted/30">
-                <Scale className="w-16 h-16 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium text-muted-foreground">Ready to Simulate</h3>
-                <p className="text-sm text-muted-foreground/70 text-center max-w-sm mt-2">
-                  Execute the simulation to view projected compliance metrics vs. original audit.
+             <div className="h-full flex flex-col items-center justify-center p-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50">
+                <div className="p-4 bg-white dark:bg-zinc-800 rounded-full shadow-sm mb-4">
+                    <Scale className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-medium text-foreground">Results will appear here</h3>
+                <p className="text-sm text-muted-foreground text-center max-w-sm mt-2">
+                  Click "Apply Mitigation" to run the optimizer.
                 </p>
              </div>
           ) : (
             <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
-              
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {/* DPD Comparison */}
                  <Card className="glass-card">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Demographic Parity Diff</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Demographic Parity Diff</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-4">
                         <div className="opacity-50">
-                            <div className="text-2xl font-bold text-foreground">{originalData?.dpd?.toFixed(3) ?? "-"}</div>
-                            <div className="text-xs text-red-500">Audit Finding</div>
+                            {/* SAFE FORMATTING */}
+                            <div className="text-2xl font-bold text-foreground">
+                                {safeFixed(originalData?.dpd)}
+                            </div>
+                            <div className="text-xs text-red-500 font-medium">Before</div>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-muted-foreground" />
+                        <ArrowRight className="w-6 h-6 text-zinc-300 dark:text-zinc-600" />
                         <div>
-                            <div className="text-3xl font-bold text-emerald-600">{mitigatedData.mitigated_dpd}</div>
-                            <div className="text-xs text-emerald-600 font-medium">Projected</div>
+                            {/* SAFE FORMATTING */}
+                            <div className="text-3xl font-bold text-emerald-600">
+                                {safeFixed(mitigatedData.projected_dpd)}
+                            </div>
+                            <div className="text-xs text-emerald-600 font-bold">After Mitigation</div>
                         </div>
                       </div>
                     </CardContent>
                  </Card>
 
+                 {/* Accuracy Comparison */}
                  <Card className="glass-card">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Model Accuracy</CardTitle>
+                        <CardTitle className="text-sm font-medium text-muted-foreground">Model Accuracy</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center gap-4">
-                         <div className="opacity-50">
-                            <div className="text-2xl font-bold text-foreground">{originalData ? (originalData.accuracy * 100).toFixed(1) : "-"}%</div>
-                            <div className="text-xs">Baseline</div>
+                          <div className="opacity-50">
+                            {/* SAFE FORMATTING */}
+                            <div className="text-2xl font-bold text-foreground">
+                                {safeFormat(originalData?.accuracy)}%
+                            </div>
+                            <div className="text-xs font-medium">Before</div>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-muted-foreground" />
+                        <ArrowRight className="w-6 h-6 text-zinc-300 dark:text-zinc-600" />
                         <div>
-                            <div className="text-3xl font-bold text-blue-600">{(mitigatedData.mitigated_accuracy * 100).toFixed(1)}%</div>
-                            <div className="text-xs text-blue-600 font-medium">Projected</div>
+                            {/* SAFE FORMATTING */}
+                            <div className="text-3xl font-bold text-blue-600">
+                                {safeFormat(mitigatedData.projected_accuracy)}%
+                            </div>
+                            <div className="text-xs text-blue-600 font-bold">New Accuracy</div>
                         </div>
                       </div>
                     </CardContent>
                  </Card>
               </div>
 
+              {/* SUCCESS BANNER */}
               <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-4 rounded-lg flex items-start gap-3">
-                 <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5" />
+                 <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
                  <div>
-                    <h4 className="font-semibold text-emerald-800 dark:text-emerald-200">Simulation Successful</h4>
+                    <h4 className="font-semibold text-emerald-900 dark:text-emerald-100">Mitigation Successful</h4>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
-                       The simulator has applied <strong>Reweighing</strong> to the dataset. 
-                       <br/>
-                       Fairness gap (DPD) improved by <span className="font-bold">{originalData ? ((originalData.dpd - mitigatedData.mitigated_dpd) * 100).toFixed(1) : 0}%</span>.
+                       Bias (DPD) improved.
                     </p>
                  </div>
               </div>
 
-              <div className="p-4 border rounded-xl bg-card">
-                  <h4 className="font-semibold mb-4 text-sm">Projected Selection Rates</h4>
-                  <BiasBarChart
-                      title=""
-                      data={[
-                        { name: "Privileged", rate: (mitigatedData.privileged_rate * 100).toFixed(1) },
-                        { name: "Unprivileged", rate: (mitigatedData.unprivileged_rate * 100).toFixed(1) }
-                      ]}
-                      height={180}
-                      colors={["#10b981", "#34d399"]}
-                   />
+              {/* CHART */}
+              <div className="p-6 border rounded-xl bg-card shadow-sm">
+                  <h4 className="font-semibold mb-6 text-sm">Simulated Selection Rates (Post-Mitigation)</h4>
+                  <div className="h-[250px] w-full">
+                    <BiasBarChart
+                        title=""
+                        data={[
+                          // SAFE FORMATTING FOR CHART
+                          { name: "Privileged", rate: safeFormat(mitigatedData.privileged_rate) },
+                          { name: "Unprivileged", rate: safeFormat(mitigatedData.unprivileged_rate) }
+                        ]}
+                        height={250}
+                        colors={["#10b981", "#34d399"]}
+                      />
+                  </div>
               </div>
             </div>
           )}

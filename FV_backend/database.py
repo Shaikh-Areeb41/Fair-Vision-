@@ -17,4 +17,5 @@ db = client[DB_NAME]
 # Define our collections
 datasets_collection = db.get_collection("datasets")
 models_collection = db.get_collection("ml_models")
-
+# --- NEW: AUTH COLLECTION ---
+users_collection = db.get_collection("users")

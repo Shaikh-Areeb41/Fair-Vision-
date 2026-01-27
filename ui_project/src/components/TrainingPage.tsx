@@ -1,53 +1,75 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { 
   Server, 
-  Cpu, 
   CheckCircle2, 
-  ShieldAlert, 
   ArrowRight, 
   Loader2, 
-  FileSearch,
   BookOpenCheck
 } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 
 interface TrainingPageProps {
-  datasetId?: string;
-  onTrainingComplete: (modelType: string) => void;
+  datasetId?: string; 
+  onTrainingComplete?: (modelType: string) => void; 
 }
 
-export function TrainingPage({ datasetId, onTrainingComplete }: TrainingPageProps) {
+export function TrainingPage({ datasetId: propId, onTrainingComplete }: TrainingPageProps) {
   const [selectedModel, setSelectedModel] = useState<"logistic" | "forest">("logistic");
   const [loading, setLoading] = useState(false);
+  const [activeId, setActiveId] = useState<string>("");
+
+  useEffect(() => {
+    const id = propId || localStorage.getItem("activeDatasetId") || sessionStorage.getItem("activeDatasetId");
+    
+    if (id) {
+      setActiveId(id);
+    } else {
+      console.error("TrainingPage: No ID found.");
+    }
+  }, [propId]);
 
   const handleTrain = async () => {
-    if (!datasetId) {
-      toast.error("No audit session found. Please restart.");
+    if (!activeId) {
+      toast.error("No audit session found. Please upload a dataset first.");
       return;
     }
 
     setLoading(true);
     try {
-      // We map the "Audit Engine" names back to the technical names expected by the backend
       const modelType = selectedModel === "logistic" ? "logistic" : "random_forest";
       
-      await axios.post(`http://127.0.0.1:8000/api/analysis/${datasetId}/train`, {
+      // 1. Call API and CAPTURE the response
+      const response = await axios.post(`http://127.0.0.1:8000/api/analysis/${activeId}/train`, {
         model_type: modelType
       });
 
+      console.log("Audit Results Received:", response.data); // Debug log
+
+      // 2. CRITICAL FIX: Save the results so Dashboard can see them
+      localStorage.setItem("analysisResults", JSON.stringify(response.data));
+      // Also save to 'dashboardData' just in case your Dashboard looks there
+      localStorage.setItem("dashboardData", JSON.stringify(response.data));
+      
+      // Save status
+      localStorage.setItem("modelStatus", "trained");
+
       toast.success("Audit Engine Initialized Successfully");
       
-      // Artificial delay to make it feel like a "System Handover"
+      // 3. Navigation with Delay
       setTimeout(() => {
-        onTrainingComplete(modelType);
+        if (onTrainingComplete) {
+            onTrainingComplete(modelType);
+        } else {
+            window.location.href = "/dashboard";
+        }
       }, 800);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Training error:", error);
-      toast.error("Failed to initialize audit engine.");
+      const msg = error.response?.data?.detail || "Failed to initialize audit engine.";
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -73,9 +95,9 @@ export function TrainingPage({ datasetId, onTrainingComplete }: TrainingPageProp
         </div>
 
         {/* Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 ">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
           
-          {/* OPTION 1: LOGISTIC REGRESSION (The "Standard") */}
+          {/* OPTION 1: LOGISTIC REGRESSION */}
           <div 
             onClick={() => setSelectedModel("logistic")}
             className={`cursor-pointer group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ${
@@ -119,47 +141,6 @@ export function TrainingPage({ datasetId, onTrainingComplete }: TrainingPageProp
                 </div>
             )}
           </div>
-
-          {/* OPTION 2: RANDOM FOREST (The "Complex" one) */}
-          {/* <div 
-            onClick={() => setSelectedModel("forest")}
-            className={`cursor-pointer group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ${
-              selectedModel === "forest" 
-                ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/10 shadow-lg ring-1 ring-purple-600" 
-                : "border-border bg-card hover:border-purple-300 dark:hover:border-purple-700"
-            }`}
-          >
-            <div className="p-6 space-y-4">
-              <div className="flex justify-between items-start">
-                <div className={`p-3 rounded-xl ${selectedModel === "forest" ? "bg-purple-600 text-white" : "bg-muted text-muted-foreground"}`}>
-                  <Cpu className="w-6 h-6" />
-                </div>
-                {selectedModel === "forest" && (
-                  <CheckCircle2 className="w-6 h-6 text-purple-600" />
-                )}
-              </div>
-              
-              <div>
-                <h3 className="text-xl font-bold text-foreground">Deep Pattern Forensic</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Uses <strong>Random Forest</strong>. Higher accuracy but "Black Box" nature.
-                </p>
-              </div>
-
-              <ul className="space-y-2 pt-2">
-                <li className="flex items-center text-sm text-muted-foreground">
-                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" /> Complex Pattern Detection
-                </li>
-                <li className="flex items-center text-sm text-muted-foreground">
-                  <CheckCircle2 className="w-4 h-4 mr-2 text-green-500" /> High Precision
-                </li>
-                <li className="flex items-center text-sm text-amber-500">
-                  <ShieldAlert className="w-4 h-4 mr-2" /> Harder to Interpret
-                </li>
-              </ul>
-            </div>
-          </div> */}
-
         </div>
 
         {/* Action Button */}
@@ -167,7 +148,7 @@ export function TrainingPage({ datasetId, onTrainingComplete }: TrainingPageProp
           <Button 
             size="lg" 
             onClick={handleTrain} 
-            disabled={loading}
+            disabled={loading || !activeId}
             className="w-full md:w-auto min-w-[200px] h-12 text-base bg-zinc-900 text-white hover:bg-zinc-800 shadow-xl transition-all hover:scale-105"
           >
             {loading ? (

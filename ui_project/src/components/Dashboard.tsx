@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-import { Link, useLocation } from "react-router-dom"; // <--- Updated Import
+import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3,
   AlertTriangle,
   CheckCircle,
   Upload,
-  Target,
   Database,
   Loader2,
   Scale,
@@ -18,16 +17,15 @@ import {
   Activity,
   ShieldCheck,
   TrendingUp
-
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Charts
+// Charts - Assuming these exist in your project structure
 import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
 import { BiasVerticalBar } from "../components/Charts/BiasVerticalBar";
 
 
-// --- INLINE UI COMPONENTS (Button, Badge, Card...) ---
+// --- INLINE UI COMPONENTS (Preserved from your code) ---
 const Button = ({ className, variant = "default", size = "default", ...props }: any) => {
   const variants: any = {
     default: "border border-black dark:border-white bg-zinc-900 text-white hover:bg-zinc-800 shadow-soft-sm hover:shadow-soft-lg",
@@ -75,20 +73,37 @@ interface DashboardProps {
 }
 
 export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardProps) {
-  // 1. Navigation Logic
   const location = useLocation();
-  const effectiveDatasetId = location.state?.datasetId || propDatasetId;
-  const datasetId = effectiveDatasetId; // Alias back to 'datasetId' so existing code works!
+  
+  // 1. ROBUST ID RESOLUTION (Checks Props -> Nav State -> LocalStorage)
+  const effectiveDatasetId = 
+    propDatasetId || 
+    location.state?.datasetId || 
+    localStorage.getItem("activeDatasetId") || 
+    sessionStorage.getItem("activeDatasetId");
+    
+  const datasetId = effectiveDatasetId;
 
   // 2. Existing State
   const [data, setData] = useState<any>(null);
   const [analysisResults, setAnalysisResults] = useState<any>(null);
   const [loadingDataset, setLoadingDataset] = useState(false);
-  const [scanning, setScanning] = useState(false);
   const [previewRows, setPreviewRows] = useState(5);
-  const [loading, setLoading] = useState<boolean>(!!effectiveDatasetId && !analysisResults);
+  
+  // 3. Initial Load (Checks for Cached Analysis Results first)
+  useEffect(() => {
+    // Check LocalStorage (where TrainingPage saves data)
+    const storedResults = localStorage.getItem("analysisResults");
+    if (storedResults) {
+        try {
+            const parsed = JSON.parse(storedResults);
+            setAnalysisResults(parsed);
+        } catch(e) { console.error("Error parsing stored results", e); }
+    }
+  }, []);
 
-  // 1. Fetch Dataset Info
+
+  // 4. Fetch Dataset Info from Backend
   useEffect(() => {
     if (datasetId) {
       setPreviewRows(5);
@@ -97,37 +112,32 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
         try {
           const response = await axios.get(`http://127.0.0.1:8000/api/datasets/${datasetId}`);
           setData(response.data);
+          
+          // If the backend has analysis data that is newer or missing from local, use it
           if (response.data?.analysis) {
-            setAnalysisResults(response.data.analysis);
-            try { sessionStorage.setItem("analysisResults", JSON.stringify(response.data.analysis)); } catch {}
-            try { sessionStorage.setItem("hasBiasAnalysis", "true"); } catch {}
+             // Only override if we don't have results yet, or if we trust backend more
+             if (!analysisResults) {
+                 setAnalysisResults(response.data.analysis);
+             }
           }
         } catch (err) {
           console.error("Failed to fetch dataset", err);
-          toast.error("Could not load dataset details.");
+          // Don't show error toast if we simply have no ID yet
+          if (datasetId) toast.error("Could not load dataset details.");
         } finally {
           setLoadingDataset(false);
         }
       };
       fetchDataset();
     } else {
-      setData(null);
-      setAnalysisResults(null);
+      // Only clear if we really have no ID and no local storage data
+      if (!localStorage.getItem("analysisResults")) {
+          setData(null);
+          setAnalysisResults(null);
+      }
     }
-  }, [datasetId]);
+  }, [datasetId]); // Dependency on ID
 
-  // 2a. Load any previously computed analysis results from sessionStorage
-  useEffect(() => {
-    if (!analysisResults) {
-      try {
-        const raw = sessionStorage.getItem("analysisResults");
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed === "object") setAnalysisResults(parsed);
-        }
-      } catch {}
-    }
-  }, [analysisResults]);
 
   // Helper to determine row count
   const getRowCount = () => {
@@ -141,7 +151,8 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
   
   const rowCount = getRowCount();
 
-  // 3. Prepare Chart Data
+  // --- CHART DATA PREPARATION ---
+  
   // Core Selection Rate
   const chartDataSelection = analysisResults ? [
     { name: "Privileged", rate: (analysisResults.privileged_rate * 100).toFixed(1) },
@@ -166,9 +177,15 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
     { name: "Unprivileged", rate: ((analysisResults.unprivileged_accuracy || 0) * 100).toFixed(1) }
   ] : [];
 
-  // 2. Mitigated Data (If available)
+  // Mitigated Data (Merge from dataset object if available, OR check local storage)
+  const mitigation = data?.mitigation || (function(){
+      try {
+        const d = JSON.parse(localStorage.getItem("dashboardData") || "{}");
+        return d.mitigation;
+      } catch { return null; }
+  })();
+
   const formatRate = (val: number) => (val * 100).toFixed(1);
-  const mitigation = data?.mitigation;
   
   const mitChartSelection = mitigation ? [
     { name: "Privileged", rate: (mitigation.privileged_rate * 100).toFixed(1) },
@@ -223,10 +240,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
     },
   ] : [];
 
-  const hasBiasAnalysisFlag = (() => {
-    try { return sessionStorage.getItem("hasBiasAnalysis") === "true"; } catch { return false; }
-  })();
-  const canProceed = !!analysisResults || analysisData?.hasBiasAnalysis || hasBiasAnalysisFlag;
+  const canProceed = !!analysisResults;
 
   return (
 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
@@ -245,7 +259,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
         <div className="lg:col-span-8 space-y-6">
 
           {/* STATE 1: NO DATA AVAILABLE */}
-          {!datasetId && (
+          {!datasetId && !analysisResults && (
             <Card className="glass-card border-dashed border-2 border-border bg-card">
               <CardContent className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="p-4 rounded-full bg-secondary mb-4">
@@ -267,7 +281,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
           )}
 
           {/* STATE 2 & 3: DATASET IS LOADED */}
-          {datasetId && (
+          {(datasetId || analysisResults) && (
             <>
               {/* Dataset Info Card */}
               <Card className="glass-card border-l-4 border-l-blue-500 shadow-sm">
@@ -283,18 +297,18 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                       <Badge variant="outline" className="animate-pulse">Loading Details...</Badge>
                     ) : (
                       <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">
-                        {data?.filename || "Uploaded File"}
+                        {data?.filename || "Active Session"}
                       </Badge>
                     )}
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {data ? (
+                  {data || analysisResults ? (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-muted-foreground">Rows: <span className="font-medium text-foreground">
                         {rowCount !== null ? rowCount.toLocaleString() : "N/A"}
                       </span></span>
-                      <span className="text-muted-foreground">Columns: <span className="font-medium text-foreground">{data.columns?.length ?? "-"}</span></span>
+                      <span className="text-muted-foreground">Columns: <span className="font-medium text-foreground">{data?.columns?.length ?? "-"}</span></span>
                       <span className="text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Configured</span>
                     </div>
                   ) : <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />}
@@ -425,7 +439,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         </CardDescription>
                       </CardHeader>
                       <CardContent>
-                         <div className="overflow-x-auto pb-4">
+                          <div className="overflow-x-auto pb-4">
                           <div className="rounded-md border border-border">
                             <table className="w-full text-sm text-left">
                               <thead className="text-xs text-muted-foreground uppercase bg-muted">
@@ -476,19 +490,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                   )}
 
                   {/* VISUAL FEEDBACK LOGIC */}
-                  {loading ? (
-                    // IF LOADING: Show "Retrieving" Skeleton
-                    <Card className="glass-card border-dashed border-2 border-yellow-200 bg-yellow-50/20 mt-6 animate-pulse">
-                      <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                         <Loader2 className="w-10 h-10 text-yellow-600 animate-spin mb-4" />
-                         <h3 className="text-xl font-bold text-foreground mb-2">Retrieving Analysis Results...</h3>
-                         <p className="text-muted-foreground max-w-sm">
-                           Synchronizing compliance data from the secure audit engine. Please wait.
-                         </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    // IF NOT LOADING (and no results): Show "Ready to Audit"
+                  {/* If we have an ID but no results yet, show Ready state */}
                     <Card className="glass-card border-dashed border-2 border-emerald-200 bg-emerald-50/50 mt-6">
                       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
                         <CheckCircle className="w-8 h-8 text-emerald-600 mb-4" />
@@ -501,7 +503,6 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         </Link>
                       </CardContent>
                     </Card>
-                  )}
                 </>
               )}
             </>
@@ -519,13 +520,13 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
             </CardHeader>
             <CardContent className="grid gap-3">
               <Link to="/mitigation">
-                 <Button variant="secondary" className="w-full" disabled={!analysisResults}>Open Fairness Simulator</Button>
+                  <Button variant="secondary" className="w-full" disabled={!analysisResults}>Open Fairness Simulator</Button>
               </Link>
               <Link to="/upload">
                 <Button variant="secondary" className="w-full">New Dataset Upload</Button>
               </Link>
               <Link to="/reports">
-                 <Button variant="ghost" className="w-full" disabled={!analysisResults}>Compliance Reports</Button>
+                  <Button variant="ghost" className="w-full" disabled={!analysisResults}>Compliance Reports</Button>
               </Link>
               {canProceed ? (
                 <Link to="/reports">

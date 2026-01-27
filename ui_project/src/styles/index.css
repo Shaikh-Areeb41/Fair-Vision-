@@ -72,3 +72,17 @@
     transition: none !important;
   }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  /* Show only the report */
+  [data-print-root],
+  [data-print-root] * {
+    visibility: visible;
+  }
+
+
+}

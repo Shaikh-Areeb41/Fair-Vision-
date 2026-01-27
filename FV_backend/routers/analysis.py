@@ -3,6 +3,7 @@ from database import datasets_collection
 from bson import ObjectId
 import pandas as pd
 import numpy as np
+import re
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import LabelEncoder, StandardScaler
@@ -15,22 +16,31 @@ router = APIRouter(prefix="/api/analysis", tags=["Analysis"])
 async def train_and_analyze(dataset_id: str):
     try:
         # 1. Fetch Dataset
+        if not ObjectId.is_valid(dataset_id):
+             raise HTTPException(status_code=400, detail="Invalid Dataset ID")
+             
         obj_id = ObjectId(dataset_id)
         dataset = await datasets_collection.find_one({"_id": obj_id})
         
         if not dataset:
             raise HTTPException(status_code=404, detail="Dataset not found")
             
-        config = dataset.get("configuration")
-        if not config:
-            raise HTTPException(status_code=400, detail="Dataset not configured.")
+        # --- FIX 1: READ CONFIG FROM ROOT (Not 'configuration') ---
+        # We check if the required fields exist directly on the dataset object
+        if "target_column" not in dataset or "sensitive_attribute" not in dataset:
+             raise HTTPException(status_code=400, detail="Dataset not configured. Please configure it first.")
 
-        target_col = config["target_column"]
-        sensitive_col = config["sensitive_attribute"]
-        privileged_val = config["privileged_group"]
+        target_col = dataset["target_column"]
+        sensitive_col = dataset["sensitive_attribute"]
+        privileged_val = dataset.get("privileged_group") # .get() is safer
 
-        # 2. Load & Clean Data
-        df = pd.DataFrame(dataset["full_data"])
+        # --- FIX 2: LOAD DATA FROM PREVIEW ---
+        # Our upload route saves 'preview' (1000 rows). We use that for analysis.
+        data_source = dataset.get("full_data") or dataset.get("preview")
+        if not data_source:
+             raise HTTPException(status_code=400, detail="No data found in dataset.")
+             
+        df = pd.DataFrame(data_source)
         
         # Basic cleaning: handle missing values
         df.replace("?", np.nan, inplace=True)
@@ -93,8 +103,7 @@ async def train_and_analyze(dataset_id: str):
 
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        # --- FIX: USE PIPELINE WITH SCALER ---
-        # This fixes the "ConvergenceWarning" by normalizing data before training
+        # Use Pipeline with Scaler
         model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, solver='lbfgs'))
         model.fit(X_train, y_train)
         
@@ -198,4 +207,5 @@ async def train_and_analyze(dataset_id: str):
 
     except Exception as e:
         print(f"Analysis Error: {e}")
+        # Return strict error messages to help debugging
         raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")

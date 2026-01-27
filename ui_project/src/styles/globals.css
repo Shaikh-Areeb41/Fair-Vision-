@@ -492,3 +492,33 @@ html:not(.dark) .dp-muted {
   transition-duration: var(--transition-base);
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  /* Hide EVERYTHING */
+  body * {
+    display: none !important;
+  }
+
+  /* Show ONLY the report */
+  [data-print-root],
+  [data-print-root] * {
+    display: block !important;
+  }
+
+  [data-print-root] {
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}

@@ -1,286 +1,182 @@
-import { useState } from "react";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useNavigate,
-  useLocation,
-} from "react-router-dom";
+import { useState, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PageTransition } from "./components/motion/PageTransition";
 import { TopNav } from "./components/TopNav";
 import { Dashboard } from "./components/Dashboard";
-import { UploadPage } from "./components/UploadPage";
-import { LoadingScreen } from "./components/LoadingScreen";
+import { UploadPage } from "./components/UploadPage"; 
 import { TrainingPage } from "./components/TrainingPage";
-import { AnalysisPage } from "./pages/AnalysisPage";
 import { MitigationPage } from "./pages/MitigationPage";
 import { ReportsPage } from "./pages/ReportsPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { toast } from "sonner";
-import { HistoryPage } from "./pages/HistoryPage";
-
-
-type User = {
-  name: string;
-  email: string;
-} | null;
-
-type BiasMetric = {
-  name: string;
-  value: number;
-  threshold: number;
-  status: "warning" | "good";
-  description: string;
-};
+import { LoginPage } from "./pages/LoginPage";
+import { HistoryPage } from "./pages/HistoryPage"; 
+import { SettingsPage } from "./pages/SettingsPage"; // <--- 1. IMPORT SETTINGS
+import { LoadingScreen } from "./components/LoadingScreen"; 
+import { Toaster } from "sonner";
 
 type AppState = {
-  user: User;
   isLoading: boolean;
   loadingTitle: string;
   loadingSubtitle: string;
-  hasModel: boolean;
-  modelFile?: File;
-  datasetFile?: File;
-  datasetId?: string;
-  trainedModel?: string;
-  analysisData: {
-    hasBiasAnalysis: boolean;
-    hasMitigation: boolean;
-    metrics: BiasMetric[];
-  };
-  selectedMitigation?: string;
 };
 
-const mockBiasMetrics = [
-  {
-    name: "Demographic Parity",
-    value: 0.15,
-    threshold: 0.1,
-    status: "warning" as const,
-    description: "Measures equal positive prediction rates across groups",
-  },
-  {
-    name: "Equalized Odds",
-    value: 0.08,
-    threshold: 0.1,
-    status: "good" as const,
-    description: "Measures equal true positive rates across groups",
-  },
-  {
-    name: "Calibration",
-    value: 0.12,
-    threshold: 0.1,
-    status: "warning" as const,
-    description: "Measures prediction accuracy consistency across groups",
-  },
-  {
-    name: "Individual Fairness",
-    value: 0.06,
-    threshold: 0.1,
-    status: "good" as const,
-    description: "Measures similar treatment of similar individuals",
-  },
-];
+const ProtectedLayout = ({ children, userName }: { children: React.ReactNode, userName: string }) => {
+  return (
+    <div className="min-h-screen bg-background flex flex-col">
+      <TopNav userName={userName} />
+      <div className="flex-1 overflow-auto">
+        {children}
+      </div>
+    </div>
+  );
+};
 
 function AppContent() {
+  const { user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [state, setState] = useState<AppState>({
-    // 1. TRICK THE APP: Set a default user immediately
-    user: { name: "Demo User", email: "demo@fairvision.ai" },
+  const [appState, setAppState] = useState<AppState>({
     isLoading: false,
     loadingTitle: "",
     loadingSubtitle: "",
-    hasModel: false,
-    analysisData: {
-      hasBiasAnalysis: false,
-      hasMitigation: false,
-      metrics: [],
-    },
   });
-
-  const updateState = (updates: Partial<AppState>) => {
-    setState((prev) => ({ ...prev, ...updates }));
-  };
 
   const handleUploadComplete = (data: {
     hasModel: boolean;
-    modelFile?: File;
-    datasetFile?: File;
+    modelFile?: File | null;
+    datasetFile?: File | null;
     datasetId?: string;
+    id?: string;
   }) => {
-    updateState({
-      hasModel: data.hasModel,
-      modelFile: data.modelFile,
-      datasetFile: data.datasetFile,
-      datasetId: data.datasetId,
+    const finalId = data.datasetId || data.id;
+
+    if (finalId) {
+      localStorage.setItem("activeDatasetId", finalId);
+      sessionStorage.setItem("activeDatasetId", finalId); 
+    } 
+
+    setAppState({
       isLoading: true,
-      loadingTitle: data.hasModel
-        ? "Checking Your Model"
-        : "Preparing Training",
-      loadingSubtitle: data.hasModel
-        ? "Validating model compatibility and structure"
-        : "Setting up training environment",
+      loadingTitle: data.hasModel ? "Checking Your Model" : "Preparing Training",
+      loadingSubtitle: data.hasModel ? "Validating compatibility" : "Setting up environment",
     });
   };
 
   const handleLoadingComplete = () => {
-    // Proceed to training after successful configuration save
-    updateState({ isLoading: false });
+    setAppState((prev) => ({ ...prev, isLoading: false }));
     navigate("/train");
   };
 
-  const handleTrainingComplete = (modelType: string) => {
-    updateState({ trainedModel: modelType });
-    navigate("/dashboard"); 
-    toast.success("Audit complete. Results loaded.");
-  };
-
-  const handleBiasAnalysisComplete = () => {
-    const newAnalysisData = {
-      hasBiasAnalysis: true,
-      hasMitigation: false,
-      metrics: [], 
-    };
-    
-    updateState({ analysisData: newAnalysisData });
-    navigate("/dashboard");
-    toast.success("Bias analysis completed! Check your dashboard for results.");
-  };
-
-  const handleMitigationSelect = (technique: string) => {
-    updateState({ selectedMitigation: technique });
-  };
-
-  const handleApplyMitigation = () => {
-    updateState({
-      analysisData: {
-        ...state.analysisData,
-        hasMitigation: true,
-      },
-    });
-    navigate("/dashboard");
-    toast.success(
-      "Mitigation applied successfully! View results on your dashboard."
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
+        <div className="animate-pulse text-sm text-zinc-500">Initializing Secure Session...</div>
+      </div>
     );
-  };
+  }
 
-
-  if (state.isLoading) {
+  if (appState.isLoading) {
     return (
       <LoadingScreen
-        title={state.loadingTitle}
-        subtitle={state.loadingSubtitle}
+        title={appState.loadingTitle}
+        subtitle={appState.loadingSubtitle}
         onComplete={handleLoadingComplete}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col ">
-      {/* 4. TopNav will now show "Demo User" */}
-      <TopNav userName={state.user?.name || "Demo User"} />
-      <div className="flex-1 overflow-auto">
-        <AnimatePresence mode="wait" initial={false}>
-          <Routes location={location} key={location.pathname}>
-            <Route
-              path="/dashboard"
-              element={
-                <PageTransition>
-                  <Dashboard 
-                    analysisData={state.analysisData} 
-                    datasetId={state.datasetId}
-                  />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/upload"
-              element={
-                <PageTransition>
-                  <UploadPage onUploadComplete={handleUploadComplete} />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/train"
-              element={
-                <PageTransition>
-                  <TrainingPage datasetId={state.datasetId} onTrainingComplete={handleTrainingComplete} />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/analysis"
-              element={
-                <PageTransition>
-                  <AnalysisPage
-                    hasModel={state.hasModel}
-                    trainedModel={state.trainedModel}
-                    datasetFile={state.datasetFile}
-                    datasetId={state.datasetId}
-                    onComplete={handleBiasAnalysisComplete}
-                  />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/mitigation"
-              element={
-                <PageTransition>
-                  <MitigationPage
-                    selectedMitigation={state.selectedMitigation}
-                    onSelect={handleMitigationSelect}
-                    onApply={handleApplyMitigation}
-                  />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/reports"
-              element={
-                <PageTransition>
-                  <ReportsPage
-                    hasBiasAnalysis={state.analysisData.hasBiasAnalysis}
-                    hasMitigation={state.analysisData.hasMitigation}
-                    hasModel={state.hasModel}
-                    trainedModel={state.trainedModel}
-                  />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <PageTransition>
-                  <SettingsPage />
-                </PageTransition>
-              }
-            />
-            <Route
-              path="/history"
-              element={
-                <PageTransition>
-                  <HistoryPage />
-                </PageTransition>
-              }
-            />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </AnimatePresence>
-      </div>
-    </div>
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        
+        <Route path="/login" element={<LoginPage />} />
+
+        <Route path="/dashboard" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <Dashboard />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/upload" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <UploadPage onUploadComplete={handleUploadComplete} />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/train" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <TrainingPage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/mitigation" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <MitigationPage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/reports" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <ReportsPage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/history" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <HistoryPage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        {/* --- 2. REGISTER SETTINGS ROUTE --- */}
+        <Route path="/settings" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <SettingsPage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </AnimatePresence>
   );
 }
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AppContent />
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <AppContent />
+        <Toaster position="top-right" />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
