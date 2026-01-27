@@ -118,7 +118,7 @@ export function AnalysisPage({
       if (!datasetId || results) return;
       try {
         setLoading(true);
-        const resp = await axios.get(` /datasets/${datasetId}`);
+        const resp = await axios.get(`/datasets/${datasetId}`);
         const r = resp.data?.analysis || null;
         if (!cancelled && r) {
           setResults(r);

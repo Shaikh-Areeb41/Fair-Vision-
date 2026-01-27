@@ -54,7 +54,7 @@ export function HistoryPage() {
   const fetchHistory = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.get(" /datasets/history", {
+      const response = await axios.get("/datasets/history", {
         headers: { Authorization: `Bearer ${token}` }
       });
       setLogs(response.data);
