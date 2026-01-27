@@ -65,31 +65,41 @@ export function LoginPage() {
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!registerData.name || !registerData.email || !registerData.password) {
-      toast.error("Please fill in all fields");
-      return;
-    }
+const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!registerData.name || !registerData.email || !registerData.password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
 
-    if (registerData.password !== registerData.confirmPassword) {
-      toast.error("Passwords do not match");
-      return;
-    }
+    if (registerData.password !== registerData.confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
 
-    setLoading(true);
-    try {
-      await register(registerData.email, registerData.password, registerData.name);
-      toast.success("Account created! Please sign in.");
-      // Switch tab to login or navigate
-      navigate("/upload"); 
-    } catch (err) {
-      // Error handled in Context usually, but safety log here
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setLoading(true);
+    try {
+      // FIX: Use axios directly to hit the correct backend route
+      await axios.post("/auth/register", {
+        email: registerData.email,
+        password: registerData.password,
+        full_name: registerData.name // Backend expects 'full_name', not 'name'
+      });
+      
+      toast.success("Account created! Please sign in.");
+      
+      // Switch the tab to "Sign In" automatically
+      const loginTab = document.querySelector('[value="login"]') as HTMLElement;
+      if (loginTab) loginTab.click();
+      
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data?.detail || "Registration failed";
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-white dark:bg-zinc-950">
