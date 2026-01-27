@@ -8,14 +8,21 @@ from routers import mitigation
 
 app = FastAPI(title="FairVision API")
 
-# Allow React to connect
+# Define your allowed sites (Localhost + Vercel)
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://fairvisison.vercel.app",  # Your Vercel URL
+    "https://fairvisison.vercel.app/"  # Just in case (with slash)
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for development
+    allow_origins=origins,    # Use the specific list
+    allow_credentials=True,   # <--- THIS IS REQUIRED FOR LOGIN
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # --- 2. REGISTER AUTH ROUTER ---
 app.include_router(auth.router)
 
