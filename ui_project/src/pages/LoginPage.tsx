@@ -35,7 +35,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       // 1. Direct Backend Call to capture the Token
-      const response = await axios.post("http://127.0.0.1:8000/api/auth/login", {
+      const response = await axios.post(" /auth/login", {
         email: loginData.email,
         password: loginData.password,
       });

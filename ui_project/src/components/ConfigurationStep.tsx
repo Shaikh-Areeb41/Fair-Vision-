@@ -71,7 +71,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         setLoading(true);
         try {
           const token = localStorage.getItem("access_token");
-          const response = await axios.get(`http://127.0.0.1:8000/api/datasets/${datasetId}`, {
+          const response = await axios.get(` /datasets/${datasetId}`, {
              headers: { Authorization: `Bearer ${token}` }
           });
           
@@ -121,7 +121,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
       const token = localStorage.getItem("access_token");
       
       // 1. Save Config
-      await axios.post(`http://127.0.0.1:8000/api/datasets/${datasetId}/configure`, {
+      await axios.post(` /datasets/${datasetId}/configure`, {
    target_column: targetColumn,         // Key must match Python
         sensitive_attribute: sensitiveAttribute, // Key must match Python
         privileged_group: privilegedGroup,   // Key must match Python
@@ -132,7 +132,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
       });
       // 2. TRIGGER ANALYSIS (New Step)
       toast.info("Starting bias analysis...");
-      await axios.post(`http://127.0.0.1:8000/api/analysis/${datasetId}/train`, {}, {
+      await axios.post(` /analysis/${datasetId}/train`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
       

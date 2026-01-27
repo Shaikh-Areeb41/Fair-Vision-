@@ -58,7 +58,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
       datasetFormData.append("file", datasetFile);
 
       const datasetResponse = await axios.post<BackendResponse>(
-        "http://127.0.0.1:8000/api/datasets/upload",
+        " /datasets/upload",
         datasetFormData,
         { 
           headers: { 
@@ -84,7 +84,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
         modelFormData.append("file", modelFile);
 
         await axios.post<BackendResponse>(
-          "http://127.0.0.1:8000/api/models/upload",
+          " /models/upload",
           modelFormData,
           { 
             headers: { 
