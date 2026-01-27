@@ -31,7 +31,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
   const fetchData = async (id: string) => {
     try {
       const token = localStorage.getItem("access_token");
-      const res = await axios.get(` /datasets/${id}`, {
+      const res = await axios.get(`/datasets/${id}`, {
          headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -49,7 +49,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
     setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.post(` /mitigation/${datasetId}/apply`, {}, {
+      const response = await axios.post(`/mitigation/${datasetId}/apply`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
       
