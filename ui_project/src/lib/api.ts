@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = " ";
+const API_URL = "";
 
 export const auth = {
   // Fix: Added types (email: string, password: string)
