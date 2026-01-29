@@ -79,10 +79,19 @@ async def apply_mitigation(dataset_id: str):
         if priv_group_val in mapping:
              priv_code = mapping[priv_group_val]
 
+        # --- FIX STARTS HERE ---
         X = df.drop(columns=[target_col])
         y = df[target_col]
-        # One-hot encode others
-        X = pd.get_dummies(X, columns=[c for c in X.columns if X[c].dtype == 'object' and c != sensitive_col])
+        
+        # *** SAFETY LOOP: Convert ALL remaining text columns to numbers ***
+        # This replaces pd.get_dummies and prevents the crash.
+        for col in X.columns:
+            # Check if the column is NOT a number (e.g., text, category, object)
+            if not pd.api.types.is_numeric_dtype(X[col]):
+                le_temp = LabelEncoder()
+                # Force conversion to string first, then encode to number
+                X[col] = le_temp.fit_transform(X[col].astype(str))
+        # --- FIX ENDS HERE ---
 
         # 3. Train Baseline Model
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
@@ -122,7 +131,7 @@ async def apply_mitigation(dataset_id: str):
         priv_preds = (priv_rows['prob'] > 0.5).astype(int)
         unpriv_preds = (unpriv_rows['prob'] > best_thresh).astype(int)
         
-        # 6. Calculate Detailed Metrics (The Missing Part)
+        # 6. Calculate Detailed Metrics
         acc_priv, tpr_priv, fpr_priv = calc_metrics(priv_rows['actual'], priv_preds)
         acc_unpriv, tpr_unpriv, fpr_unpriv = calc_metrics(unpriv_rows['actual'], unpriv_preds)
 
