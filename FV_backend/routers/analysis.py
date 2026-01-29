@@ -25,17 +25,15 @@ async def train_and_analyze(dataset_id: str):
         if not dataset:
             raise HTTPException(status_code=404, detail="Dataset not found")
             
-        # --- FIX 1: READ CONFIG FROM ROOT (Not 'configuration') ---
-        # We check if the required fields exist directly on the dataset object
+        # --- CONFIG CHECK ---
         if "target_column" not in dataset or "sensitive_attribute" not in dataset:
              raise HTTPException(status_code=400, detail="Dataset not configured. Please configure it first.")
 
         target_col = dataset["target_column"]
         sensitive_col = dataset["sensitive_attribute"]
-        privileged_val = dataset.get("privileged_group") # .get() is safer
+        privileged_val = dataset.get("privileged_group")
 
-        # --- FIX 2: LOAD DATA FROM PREVIEW ---
-        # Our upload route saves 'preview' (1000 rows). We use that for analysis.
+        # --- LOAD DATA ---
         data_source = dataset.get("full_data") or dataset.get("preview")
         if not data_source:
              raise HTTPException(status_code=400, detail="No data found in dataset.")
@@ -46,7 +44,7 @@ async def train_and_analyze(dataset_id: str):
         df.replace("?", np.nan, inplace=True)
         df.dropna(inplace=True)
 
-        # --- HANDLING PRIVILEGED GROUP LOGIC ---
+        # --- 2. HANDLING PRIVILEGED GROUP LOGIC ---
         
         # A. Check for Numeric Thresholds (e.g., ">40")
         if pd.api.types.is_numeric_dtype(df[sensitive_col]):
@@ -78,7 +76,7 @@ async def train_and_analyze(dataset_id: str):
             privileged_val = "Privileged_Group"
             print(f"Applied List Split: {sensitive_col} in {target_values}")
 
-        # 3. Encode Data CORRECTLY
+        # --- 3. Encode Target & Sensitive Columns CORRECTLY ---
         sensitive_mapping = {} 
 
         # A. Encode the Target 
@@ -94,25 +92,32 @@ async def train_and_analyze(dataset_id: str):
         if privileged_val in mapping:
              sensitive_mapping['priv'] = mapping[privileged_val]
 
-        # 4. Train Model with One-Hot Encoding
+        # --- 4. PREPARE & TRAIN (THE FIX) ---
         X = df.drop(columns=[target_col])
         y = df[target_col]
         
-        # Exclude sensitive_col from dummies because we already encoded it
-        X = pd.get_dummies(X, columns=[c for c in X.columns if X[c].dtype == 'object' and c != sensitive_col])
+        # *** SAFETY LOOP: Convert ALL remaining text columns to numbers ***
+        # This prevents "could not convert string to float"
+        for col in X.columns:
+            # Check if the column is NOT a number (e.g., text, category, object)
+            if not pd.api.types.is_numeric_dtype(X[col]):
+                le_temp = LabelEncoder()
+                # Force conversion to string first, then encode to number
+                X[col] = le_temp.fit_transform(X[col].astype(str))
 
+        # Split Data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
-        # Use Pipeline with Scaler
+        # Train Model
         model = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000, solver='lbfgs'))
         model.fit(X_train, y_train)
         
         y_pred = model.predict(X_test)
 
-        # 5. Calculate Standard Metrics
+        # --- 5. Calculate Standard Metrics ---
         overall_accuracy = accuracy_score(y_test, y_pred)
 
-        # 6. Calculate Fairness Metrics (SRS Requirements)
+        # --- 6. Calculate Fairness Metrics (SRS Requirements) ---
         test_df = X_test.copy()
         test_df['actual'] = y_test
         test_df['predicted'] = y_pred
