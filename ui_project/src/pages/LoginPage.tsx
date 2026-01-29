@@ -35,7 +35,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       // 1. Direct Backend Call to capture the Token
-      const response = await axios.post("/auth/login", {
+      const response = await axios.post("https://ui-785k.onrender.com/api/auth/login", {
         email: loginData.email,
         password: loginData.password,
       });
