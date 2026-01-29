@@ -11,7 +11,6 @@ import {
   LogOut, 
   Lock,
   KeyRound,
-  CheckCircle2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -62,8 +61,10 @@ export function SettingsPage() {
         token = token.replace(/^"|"$/g, '');
 
         // 2. Call Backend
+            
+        const API_URL = import.meta.env.VITE_API_URL; 
         const response = await axios.post(
-            "https://ui-785k.onrender.com/api/auth/change-password",
+            `${API_URL}/auth/change-password`,
             {
                 current_password: currentPassword,
                 new_password: newPassword

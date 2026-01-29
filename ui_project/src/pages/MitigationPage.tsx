@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { 
   Scale, ArrowRight, CheckCircle, Loader2, RefreshCw, Sliders, ArrowLeft
 } from "lucide-react";
@@ -8,13 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
+const API_URL = import.meta.env.VITE_API_URL; 
 
 interface MitigationPageProps {
   onApply?: () => void;
 }
 
 export function MitigationPage({ onApply }: MitigationPageProps) {
-  const navigate = useNavigate();
   const [datasetId, setDatasetId] = useState<string | null>(null);
   const [originalData, setOriginalData] = useState<any>(null);
   const [mitigatedData, setMitigatedData] = useState<any>(null);
@@ -31,7 +31,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
   const fetchData = async (id: string) => {
     try {
       const token = localStorage.getItem("access_token");
-      const res = await axios.get(`https://ui-785k.onrender.com/api/datasets/${id}`, {
+      const res = await axios.get(`${API_URL}/datasets/${id}`, {
          headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -49,7 +49,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
     setLoading(true);
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.post(`https://ui-785k.onrender.com/api/mitigation/${datasetId}/apply`, {}, {
+      const response = await axios.post(`${API_URL}/mitigation/${datasetId}/apply`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
       

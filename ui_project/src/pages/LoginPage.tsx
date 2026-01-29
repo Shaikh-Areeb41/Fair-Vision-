@@ -35,7 +35,7 @@ export function LoginPage() {
     setLoading(true);
     try {
       // 1. Direct Backend Call to capture the Token
-      const response = await axios.post("https://ui-785k.onrender.com/api/auth/login", {
+      const response = await axios.post(`${API_URL}/auth/login`, {
         email: loginData.email,
         password: loginData.password,
       });
@@ -64,7 +64,7 @@ export function LoginPage() {
       setLoading(false);
     }
   };
-
+const API_URL = import.meta.env.VITE_API_URL; 
 const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerData.name || !registerData.email || !registerData.password) {
@@ -80,7 +80,7 @@ const handleRegister = async (e: React.FormEvent) => {
     setLoading(true);
     try {
       // FIX: Use axios directly to hit the correct backend route
-      await axios.post("/auth/register", {
+      await axios.post(`${API_URL}/auth/register`, {
         email: registerData.email,
         password: registerData.password,
         full_name: registerData.name // Backend expects 'full_name', not 'name'

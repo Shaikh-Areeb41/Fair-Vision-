@@ -41,6 +41,7 @@ interface AuditLog {
 }
 
 export function HistoryPage() {
+  const API_URL = import.meta.env.VITE_API_URL; 
   const navigate = useNavigate();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export function HistoryPage() {
   const fetchHistory = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.get("https://ui-785k.onrender.com/api/datasets/history", {
+      const response = await axios.get(`${API_URL}/datasets/history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setLogs(response.data);
@@ -78,7 +79,7 @@ export function HistoryPage() {
     setDeletingId(id);
     try {
         const token = localStorage.getItem("access_token");
-        await axios.delete(`/datasets/${id}`, {
+        await axios.delete(`${API_URL}/datasets/${id}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         

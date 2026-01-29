@@ -41,7 +41,8 @@ export function TrainingPage({ datasetId: propId, onTrainingComplete }: Training
       const modelType = selectedModel === "logistic" ? "logistic" : "random_forest";
       
       // 1. Call API and CAPTURE the response
-      const response = await axios.post(`https://ui-785k.onrender.com/api/analysis/${activeId}/train`, {
+      const API_URL = import.meta.env.VITE_API_URL;
+      const response = await axios.post(`${API_URL}/analysis/${activeId}/train`, {
         model_type: modelType
       });
 
@@ -95,17 +96,18 @@ export function TrainingPage({ datasetId: propId, onTrainingComplete }: Training
         </div>
 
         {/* Selection Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+        <div className="flex justify-center mt-8">
           
           {/* OPTION 1: LOGISTIC REGRESSION */}
-          <div 
-            onClick={() => setSelectedModel("logistic")}
-            className={`cursor-pointer group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ${
-              selectedModel === "logistic" 
-                ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/10 shadow-lg ring-1 ring-purple-600" 
-                : "border-border bg-card hover:border-purple-300 dark:hover:border-purple-700"
-            }`}
-          >
+              <div 
+                onClick={() => setSelectedModel("logistic")}
+                // ADD "w-full max-w-md" at the start of the class string:
+                className={`w-full max-w-md cursor-pointer group relative overflow-hidden rounded-2xl border-2 transition-all duration-300 ${
+                  selectedModel === "logistic" 
+                    ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/10 shadow-lg ring-1 ring-purple-600" 
+                    : "border-border bg-card hover:border-purple-300 dark:hover:border-purple-700"
+                }`}
+              >
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-start">
                 <div className={`p-3 rounded-xl ${selectedModel === "logistic" ? "bg-purple-600 text-white" : "bg-muted text-muted-foreground"}`}>

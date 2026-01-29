@@ -13,7 +13,6 @@ import { LoginPage } from "./pages/LoginPage";
 import { HistoryPage } from "./pages/HistoryPage"; 
 import { SettingsPage } from "./pages/SettingsPage"; // <--- 1. IMPORT SETTINGS
 import { LoadingScreen } from "./components/LoadingScreen"; 
-import { Toaster } from "sonner";
 
 type AppState = {
   isLoading: boolean;
@@ -175,7 +174,6 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <AppContent />
-        <Toaster position="top-right" />
       </BrowserRouter>
     </AuthProvider>
   );

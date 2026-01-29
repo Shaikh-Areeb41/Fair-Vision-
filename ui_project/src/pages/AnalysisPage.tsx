@@ -19,7 +19,7 @@ import {
 import { Button } from "../components/ui/button";
 import { BiasBarChart } from "../components/Charts/BiasBarChart";
 import { BiasVerticalBar } from "../components/Charts/BiasVerticalBar";
-
+const API_URL = import.meta.env.VITE_API_URL; 
 
 // --- HELPER: Prepare Data for Charts ---
 // This logic mirrors what we did in the Dashboard to format data for Recharts
@@ -118,7 +118,7 @@ export function AnalysisPage({
       if (!datasetId || results) return;
       try {
         setLoading(true);
-        const resp = await axios.get(`https://ui-785k.onrender.com/api/datasets/${datasetId}`);
+        const resp = await axios.get(`${API_URL}/datasets/${datasetId}`);
         const r = resp.data?.analysis || null;
         if (!cancelled && r) {
           setResults(r);

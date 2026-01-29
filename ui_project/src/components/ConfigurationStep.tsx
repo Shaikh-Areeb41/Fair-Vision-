@@ -37,6 +37,7 @@ interface ConfigurationStepProps {
 }
 
 export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: ConfigurationStepProps) {
+  const API_URL = import.meta.env.VITE_API_URL; 
   const [columns, setColumns] = useState<string[]>([]);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +72,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         setLoading(true);
         try {
           const token = localStorage.getItem("access_token");
-          const response = await axios.get(`https://ui-785k.onrender.com/api/datasets/${datasetId}`, {
+          const response = await axios.get(`${API_URL}/datasets/${datasetId}`, {
              headers: { Authorization: `Bearer ${token}` }
           });
           
@@ -118,10 +119,11 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
     }
 
     try {
+
       const token = localStorage.getItem("access_token");
       
       // 1. Save Config
-      await axios.post(`https://ui-785k.onrender.com/api/datasets/${datasetId}/configure`, {
+      await axios.post(`${API_URL}/datasets/${datasetId}/configure`, {
    target_column: targetColumn,         // Key must match Python
         sensitive_attribute: sensitiveAttribute, // Key must match Python
         privileged_group: privilegedGroup,   // Key must match Python
@@ -132,7 +134,7 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
       });
       // 2. TRIGGER ANALYSIS (New Step)
       toast.info("Starting bias analysis...");
-      await axios.post(`https://ui-785k.onrender.com/api/analysis/${datasetId}/train`, {}, {
+      await axios.post(`${API_URL}/analysis/${datasetId}/train`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
       
