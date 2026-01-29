@@ -23,7 +23,7 @@ import { toast } from "sonner";
 // Charts - Assuming these exist in your project structure
 import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
 import { BiasVerticalBar } from "../components/Charts/BiasVerticalBar";
-
+const API_URL = import.meta.env.VITE_API_URL; 
 
 // --- INLINE UI COMPONENTS (Preserved from your code) ---
 const Button = ({ className, variant = "default", size = "default", ...props }: any) => {
@@ -110,7 +110,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
       const fetchDataset = async () => {
         setLoadingDataset(true);
         try {
-          const response = await axios.get(`https://ui-785k.onrender.com/api/datasets/${datasetId}`);
+          const response = await axios.get(`${API_URL}/datasets/${datasetId}`);
           setData(response.data);
           
           // If the backend has analysis data that is newer or missing from local, use it
@@ -384,14 +384,14 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                       <Card className="border-l-4 border-l-emerald-500 p-4 flex justify-between items-center">
                         <div>
                            <p className="text-xs text-muted-foreground font-bold uppercase">Projected Fairness (DPD)</p>
-                           <p className="text-2xl font-bold text-emerald-600">{mitigation.mitigated_dpd}</p>
+                           <p className="text-2xl font-bold text-emerald-600">{mitigation.projected_dpd}</p>
                         </div>
                         <TrendingUp className="w-8 h-8 text-emerald-200" />
                       </Card>
                       <Card className="border-l-4 border-l-blue-500 p-4 flex justify-between items-center">
                         <div>
                            <p className="text-xs text-muted-foreground font-bold uppercase">Projected Accuracy</p>
-                           <p className="text-2xl font-bold text-blue-600">{formatRate(mitigation.mitigated_accuracy)}%</p>
+                           <p className="text-2xl font-bold text-blue-600">{formatRate(mitigation.projected_accuracy)}%</p>
                         </div>
                         <CheckCircle className="w-8 h-8 text-blue-200" />
                       </Card>

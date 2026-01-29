@@ -26,6 +26,7 @@ interface UploadPageProps {
 }
 
 export function UploadPage({ onUploadComplete }: UploadPageProps) {
+  const API_URL = import.meta.env.VITE_API_URL; 
   const navigate = useNavigate();
   const [modelFile, setModelFile] = useState<File | null>(null);
   const [datasetFile, setDatasetFile] = useState<File | null>(null);
@@ -56,9 +57,9 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
       // 2. Upload Dataset with Auth Header
       const datasetFormData = new FormData();
       datasetFormData.append("file", datasetFile);
-
+      
       const datasetResponse = await axios.post<BackendResponse>(
-        "https://ui-785k.onrender.com/api/datasets/upload",
+        `${API_URL}/datasets/upload`,
         datasetFormData,
         { 
           headers: { 
@@ -84,7 +85,7 @@ export function UploadPage({ onUploadComplete }: UploadPageProps) {
         modelFormData.append("file", modelFile);
 
         await axios.post<BackendResponse>(
-          "https://ui-785k.onrender.com/api/models/upload",
+          `${API_URL}/models/upload`,
           modelFormData,
           { 
             headers: { 
