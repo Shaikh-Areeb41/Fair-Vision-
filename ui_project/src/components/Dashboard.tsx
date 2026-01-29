@@ -110,7 +110,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
       const fetchDataset = async () => {
         setLoadingDataset(true);
         try {
-          const response = await axios.get(`http://127.0.0.1:8000/api/datasets/${datasetId}`);
+          const response = await axios.get(`https://ui-785k.onrender.com/api/datasets/${datasetId}`);
           setData(response.data);
           
           // If the backend has analysis data that is newer or missing from local, use it
