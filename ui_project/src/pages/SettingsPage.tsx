@@ -63,7 +63,7 @@ export function SettingsPage() {
 
         // 2. Call Backend
         const response = await axios.post(
-            "/auth/change-password",
+            "https://ui-785k.onrender.com/api/auth/change-password",
             {
                 current_password: currentPassword,
                 new_password: newPassword

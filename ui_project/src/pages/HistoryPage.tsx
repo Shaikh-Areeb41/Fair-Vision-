@@ -54,7 +54,7 @@ export function HistoryPage() {
   const fetchHistory = async () => {
     try {
       const token = localStorage.getItem("access_token");
-      const response = await axios.get("/datasets/history", {
+      const response = await axios.get("https://ui-785k.onrender.com/api/datasets/history", {
         headers: { Authorization: `Bearer ${token}` }
       });
       setLogs(response.data);
@@ -78,7 +78,7 @@ export function HistoryPage() {
     setDeletingId(id);
     try {
         const token = localStorage.getItem("access_token");
-        await axios.delete(` /datasets/${id}`, {
+        await axios.delete(`/datasets/${id}`, {
             headers: { Authorization: `Bearer ${token}` }
         });
         
