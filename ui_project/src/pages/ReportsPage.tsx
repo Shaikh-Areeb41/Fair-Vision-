@@ -39,6 +39,21 @@ export function ReportsPage() {
     return (Number(val) * 100).toFixed(1);
   };
 
+  const renderMarkdownBold = (text: string) => {
+    return text.split("\n").map((line, lineIdx, lines) => (
+      <span key={`line-${lineIdx}`}>
+        {line.split(/(\*\*.*?\*\*)/g).map((segment, segIdx) => {
+          const boldMatch = segment.match(/^\*\*(.*?)\*\*$/);
+          if (boldMatch) {
+            return <strong key={`seg-${lineIdx}-${segIdx}`}>{boldMatch[1]}</strong>;
+          }
+          return <span key={`seg-${lineIdx}-${segIdx}`}>{segment}</span>;
+        })}
+        {lineIdx < lines.length - 1 ? <br /> : null}
+      </span>
+    ));
+  };
+
   useEffect(() => {
     try {
       const analysisStored = localStorage.getItem("analysisResults") || sessionStorage.getItem("analysisResults");
@@ -180,19 +195,20 @@ export function ReportsPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="col-span-2 prose prose-sm max-w-none text-zinc-800">
-              <p className="leading-relaxed whitespace-pre-line">{reportText}</p>
+              <p className="leading-relaxed">{renderMarkdownBold(reportText)}</p>
             </div>
-            <div className="bg-white p-4 rounded-xl border border-zinc-200 shadow-sm">
+            <div className="bg-white p-5 rounded-xl border border-zinc-200 shadow-sm">
               <h4 className="font-semibold mb-4 text-[10px] uppercase text-center text-zinc-500">Initial Disparity Detected</h4>
-              <div className="bg-black-800">
+              <div>
                 <BiasBarChart 
                    title="" 
                    data={[
                      { name: groupNames.priv, rate: safeRate(data.privileged_rate) },
                      { name: groupNames.unpriv, rate: safeRate(data.unprivileged_rate) }
                    ]} 
-                   height={120}
-                   colors={["#18181b", "#db11ff"]} 
+                   height={170}
+                   clean
+                   colors={["#2563eb", "#06b6d4"]} 
                 />
               </div>
             </div>
@@ -236,7 +252,7 @@ export function ReportsPage() {
                  </span>
               </div>
               <p className="text-sm leading-relaxed text-zinc-800 mb-6">
-                {mitigationNarrative}
+                {renderMarkdownBold(mitigationNarrative)}
               </p>
 
               <div className="grid grid-cols-2 gap-8 pt-4 border-t border-zinc-200">
@@ -298,6 +314,7 @@ export function ReportsPage() {
                          { name: groupNames.unpriv, rate: safeRate(data.unprivileged_rate) }
                        ]} 
                        height={100}
+                        clean
                        colors={["#ef4444", "#fca5a5"]} 
                     />
                   </div>
@@ -312,6 +329,7 @@ export function ReportsPage() {
                          { name: groupNames.unpriv, rate: safeRate(mitigation.unprivileged_rate) }
                        ]} 
                        height={100}
+                        clean
                        colors={["#059669", "#6ee7b7"]} 
                     />
                   </div>

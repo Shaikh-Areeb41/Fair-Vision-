@@ -10,11 +10,23 @@ import { Shield, Eye, EyeOff, Mail, Lock, Github, Loader2 } from "lucide-react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { toast } from "sonner";
 import axios from "axios"; // <--- ADDED: Necessary for direct API call
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../components/ui/dialog";
 
 export function LoginPage() {
-  const { login, register } = useAuth(); 
+  const { login } = useAuth(); 
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [devResetLink, setDevResetLink] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -24,6 +36,7 @@ export function LoginPage() {
     password: "",
     confirmPassword: "",
   });
+  const API_URL = import.meta.env.VITE_API_URL;
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +54,7 @@ export function LoginPage() {
       });
 
       // 2. Extract Token
-      const { access_token, user } = response.data;
+      const { access_token } = response.data;
 
       if (!access_token) {
         throw new Error("No access token received.");
@@ -64,7 +77,6 @@ export function LoginPage() {
       setLoading(false);
     }
   };
-const API_URL = import.meta.env.VITE_API_URL; 
 const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!registerData.name || !registerData.email || !registerData.password) {
@@ -101,8 +113,36 @@ const handleRegister = async (e: React.FormEvent) => {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!forgotEmail) {
+      toast.error("Please enter your registered email");
+      return;
+    }
+
+    setForgotLoading(true);
+    try {
+      const response = await axios.post(`${API_URL}/auth/forgot-password`, { email: forgotEmail });
+      const fallbackLink = response.data?.dev_reset_link;
+
+      if (fallbackLink) {
+        setDevResetLink(fallbackLink);
+        toast.info("Email service is not configured. Use the dev reset link below.");
+      } else {
+        setDevResetLink("");
+        toast.success("If your email is registered, a reset link has been sent.");
+        setForgotPasswordOpen(false);
+        setForgotEmail("");
+      }
+    } catch (err: any) {
+      const msg = err.response?.data?.detail || "Failed to send reset email";
+      toast.error(msg);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-white dark:bg-zinc-950">
+    <div className="relative min-h-screen overflow-hidden bg-zinc-950">
 
       {/* Theme toggle */}
       <div className="absolute top-4 right-4 z-10">
@@ -114,33 +154,33 @@ const handleRegister = async (e: React.FormEvent) => {
           {/* Brand */}
           <div className="text-center mb-8">
             <div className="flex items-center justify-center gap-3 mb-4">
-              <div className="p-3 rounded-xl border border-zinc-200 dark:border-zinc-700/60 bg-zinc-100 dark:bg-zinc-800">
-                <Shield className="w-8 h-8 text-zinc-900 dark:text-zinc-100" />
+              <div className="p-3 rounded-xl border border-zinc-700/60 bg-zinc-800">
+                <Shield className="w-8 h-8 text-zinc-100" />
               </div>
-              <h1 className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">FairVision</h1>
+              <h1 className="text-3xl font-bold tracking-tight text-zinc-100">FairVision</h1>
             </div>
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-zinc-400">
               Advanced AI fairness platform for bias detection and mitigation
             </p>
           </div>
 
           {/* Auth Card */}
-          <Card className="glass-card rounded-2xl shadow-xl border-zinc-200 dark:border-zinc-800">
+          <Card className="glass-card rounded-2xl shadow-xl border-zinc-800">
             <CardHeader>
-              <CardTitle className="text-center text-2xl text-zinc-900 dark:text-zinc-100">Welcome</CardTitle>
+              <CardTitle className="text-center text-2xl text-zinc-100">Welcome</CardTitle>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="login" className="w-full">
-                <TabsList className="grid w-full grid-cols-2 mb-6 glass-plate p-1 rounded-lg bg-zinc-100 dark:bg-zinc-900">
+                <TabsList className="grid w-full grid-cols-2 mb-6 glass-plate p-1 rounded-lg bg-zinc-900">
                   <TabsTrigger
                     value="login"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-zinc-100 transition-colors"
+                    className="rounded-md data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 transition-colors"
                   >
                     Sign In
                   </TabsTrigger>
                   <TabsTrigger
                     value="register"
-                    className="rounded-md data-[state=active]:bg-white data-[state=active]:text-zinc-900 dark:data-[state=active]:bg-zinc-800 dark:data-[state=active]:text-zinc-100 transition-colors"
+                    className="rounded-md data-[state=active]:bg-zinc-800 data-[state=active]:text-zinc-100 transition-colors"
                   >
                     Sign Up
                   </TabsTrigger>
@@ -151,24 +191,24 @@ const handleRegister = async (e: React.FormEvent) => {
                   <Button
                     type="button"
                     onClick={() => toast.info("Google sign-in coming soon")}
-                    className="w-full border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-900/70 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/70"
+                    className="w-full border border-zinc-700/60 bg-zinc-900/70 text-zinc-100 hover:bg-zinc-800/70"
                   >
                     <Mail className="w-4 h-4 mr-2" /> Google
                   </Button>
                   <Button
                     type="button"
                     onClick={() => toast.info("GitHub sign-in coming soon")}
-                    className="w-full border border-zinc-200 dark:border-zinc-700/60 bg-white dark:bg-zinc-900/70 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800/70"
+                    className="w-full border border-zinc-700/60 bg-zinc-900/70 text-zinc-100 hover:bg-zinc-800/70"
                   >
                     <Github className="w-4 h-4 mr-2" /> GitHub
                   </Button>
                 </div>
                 <div className="relative mb-5">
                   <div className="absolute inset-0 flex items-center" aria-hidden="true">
-                    <span className="w-full border-t border-zinc-200 dark:border-zinc-700/60" />
+                    <span className="w-full border-t border-zinc-700/60" />
                   </div>
                   <div className="relative flex justify-center text-xs">
-                    <span className="bg-white dark:bg-zinc-950 px-2 text-zinc-500">or continue with</span>
+                    <span className="px-2 pt-1 text-zinc-500">or continue with</span>
                   </div>
                 </div>
 
@@ -218,11 +258,17 @@ const handleRegister = async (e: React.FormEvent) => {
                     </div>
 
                     <div className="flex items-center justify-between text-sm">
-                      <label className="inline-flex items-center gap-2 text-zinc-600 dark:text-zinc-400 select-none">
+                      <label className="inline-flex items-center gap-2 text-zinc-400 select-none">
                         <input type="checkbox" className="h-4 w-4 rounded border-zinc-300" />
                         Remember me
                       </label>
-                      <a href="#" className="text-sky-600 dark:text-sky-400 hover:underline">Forgot password?</a>
+                      <button
+                        type="button"
+                        onClick={() => setForgotPasswordOpen(true)}
+                        className="text-sky-400 hover:underline"
+                      >
+                        Forgot password?
+                      </button>
                     </div>
 
                     <Button type="submit" className="w-full bg-zinc-900 text-white hover:bg-zinc-800" size="lg" disabled={loading}>
@@ -291,6 +337,67 @@ const handleRegister = async (e: React.FormEvent) => {
           <p className="text-center text-sm text-zinc-500 mt-6">
             By signing up, you agree to our Terms of Service and Privacy Policy
           </p>
+
+          <Dialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+            <DialogContent className="bg-zinc-950 border-zinc-700 text-zinc-100 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-zinc-100">Reset your password</DialogTitle>
+                <DialogDescription className="text-zinc-300">
+                  Enter your registered email address. We will send a password reset link.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-2">
+                <Label htmlFor="forgot-email" className="text-zinc-200">Email</Label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="you@company.com"
+                  className="bg-zinc-900 border-zinc-700 text-zinc-100 placeholder:text-zinc-400"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                />
+              </div>
+
+              {devResetLink ? (
+                <div className="rounded-md border border-zinc-200 dark:border-zinc-700 p-3 text-xs text-zinc-700 dark:text-zinc-300 space-y-2">
+                  <p>Email was not sent from backend. Use this development reset link:</p>
+                  <a href={devResetLink} className="break-all text-sky-600 dark:text-sky-400 hover:underline">
+                    {devResetLink}
+                  </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(devResetLink);
+                      toast.success("Reset link copied");
+                    }}
+                  >
+                    Copy link
+                  </Button>
+                </div>
+              ) : null}
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setForgotPasswordOpen(false);
+                    setDevResetLink("");
+                  }}
+                  disabled={forgotLoading}
+                >
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleForgotPassword} disabled={forgotLoading}>
+                  {forgotLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Send reset link
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

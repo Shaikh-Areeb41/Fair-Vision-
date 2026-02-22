@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 from routers import datasets
 from routers import ml_models
 from routers import analysis
@@ -12,14 +13,20 @@ app = FastAPI(title="FairVision API")
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "https://fairvisison.vercel.app",  # Your Vercel URL
-    "https://fairvisison.vercel.app/"  # Just in case (with slash)
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
+    "https://fairvision.vercel.app",
 ]
+
+frontend_url = os.getenv("FRONTEND_URL")
+if frontend_url:
+    origins.append(frontend_url.rstrip("/"))
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,    # Use the specific list
-    allow_credentials=True,   # <--- THIS IS REQUIRED FOR LOGIN
+    allow_origins=origins,
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

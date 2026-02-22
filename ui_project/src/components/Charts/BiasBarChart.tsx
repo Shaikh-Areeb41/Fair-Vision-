@@ -21,6 +21,7 @@ interface BiasBarChartProps {
   colors?: [string, string]; // [Color for Privileged, Color for Unprivileged]
   height?: number; // Allow custom height
   layout?: "vertical" | "horizontal";
+  clean?: boolean;
 }
 
 export const BiasBarChart: React.FC<BiasBarChartProps> = ({
@@ -29,11 +30,13 @@ export const BiasBarChart: React.FC<BiasBarChartProps> = ({
   description,
   colors = ["#8b5cf6", "#ec4899"], // Default Purple/Pink
   height = 200,
-  layout = "vertical"
+  layout = "vertical",
+  clean = false,
 }) => {
   
   return (
-    <div className="rounded-xl border border-border bg-card text-card-foreground shadow-soft h-full glass-card">
+    <div className={clean ? "h-full bg-transparent" : "rounded-xl border border-border bg-card text-card-foreground shadow-soft h-full glass-card"}>
+      {(title || description) ? (
       <div className="flex flex-col space-y-1.5 p-6 pb-2">
         <h3 className="font-semibold leading-none tracking-tight text-foreground">
           {title}
@@ -44,19 +47,20 @@ export const BiasBarChart: React.FC<BiasBarChartProps> = ({
           </p>
         )}
       </div>
-      <div className="p-6 pt-0" style={{ height: `${height}px` }}>
+      ) : null}
+      <div className={clean ? "p-0" : "p-6 pt-0"} style={{ height: `${height}px` }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout={layout}
-            margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+            margin={clean ? { top: 8, right: 12, left: 8, bottom: 8 } : { top: 5, right: 30, left: 20, bottom: 5 }}
           >
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.3} />
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={clean ? 0.15 : 0.3} />
             <XAxis type="number" domain={[0, 100]} unit="%" hide={height < 200} />
             <YAxis 
               dataKey="name" 
               type="category" 
-              width={100} 
+              width={clean ? 120 : 100} 
               tick={{ fontSize: 11, fill: "currentColor" }} 
             />
             <Tooltip
@@ -70,7 +74,7 @@ export const BiasBarChart: React.FC<BiasBarChartProps> = ({
                 color: "var(--foreground)"
               }}
             />
-            <Bar dataKey="rate" radius={[0, 4, 4, 0]} barSize={height > 200 ? 40 : 20}>
+            <Bar dataKey="rate" radius={[0, 6, 6, 0]} barSize={height > 180 ? 28 : 20}>
               {data.map((entry, index) => (
                 <Cell 
                   key={`cell-${index}`} 

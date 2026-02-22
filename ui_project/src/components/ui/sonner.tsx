@@ -1,5 +1,6 @@
 import { Toaster as Sonner } from "sonner";
 import type { ToasterProps } from "sonner";
+export { toast } from "sonner";
 
 // Simple wrapper that defaults to a dark theme. Avoid using next-themes here
 // because this app doesn't include a ThemeProvider and calling useTheme

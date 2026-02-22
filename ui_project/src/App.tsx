@@ -10,6 +10,7 @@ import { TrainingPage } from "./components/TrainingPage";
 import { MitigationPage } from "./pages/MitigationPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { HistoryPage } from "./pages/HistoryPage"; 
 import { SettingsPage } from "./pages/SettingsPage"; // <--- 1. IMPORT SETTINGS
 import { LoadingScreen } from "./components/LoadingScreen"; 
@@ -91,6 +92,7 @@ function AppContent() {
       <Routes location={location} key={location.pathname}>
         
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         <Route path="/dashboard" element={
           user ? (
