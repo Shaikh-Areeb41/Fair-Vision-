@@ -15,7 +15,8 @@ origins = [
     "http://127.0.0.1:5173",
     "http://localhost:4173",
     "http://127.0.0.1:4173",
-    "https://fairvision.vercel.app",
+   "https://fairvisison.vercel.app",  # Your Vercel URL
+   "https://fairvisison.vercel.app/"  # Just in case (with slash)
 ]
 
 frontend_url = os.getenv("FRONTEND_URL")
