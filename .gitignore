@@ -2,3 +2,7 @@ node_modules/
 __pycache__/
 *.pyc
 .env.local
+FV_backend/.env
+.env.*
+!.env.example
+FV_backend/.env
