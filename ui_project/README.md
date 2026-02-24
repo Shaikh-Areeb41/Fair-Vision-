@@ -71,3 +71,32 @@ export default defineConfig([
   },
 ])
 ```
+
+## OAuth (Google + GitHub)
+
+Social login buttons on the login page now redirect to backend OAuth routes:
+
+- `GET /api/auth/google/login`
+- `GET /api/auth/github/login`
+
+After provider callback, backend redirects to frontend route:
+
+- `/oauth/callback?token=...&email=...&full_name=...`
+
+### Required env vars
+
+Frontend (`ui_project/.env`):
+
+- `VITE_API_URL` (example: `http://localhost:8000/api` or `https://ui-785k.onrender.com/api`)
+
+Backend (`FV_backend/.env`):
+
+- `FRONTEND_URL`
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_CALLBACK_URL`
+- `GITHUB_CLIENT_ID`
+- `GITHUB_CLIENT_SECRET`
+- `GITHUB_CALLBACK_URL`
+
+Use `.env.example` files in both projects as templates for local and production values.

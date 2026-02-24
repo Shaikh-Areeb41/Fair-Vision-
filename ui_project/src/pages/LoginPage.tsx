@@ -38,6 +38,14 @@ export function LoginPage() {
   });
   const API_URL = import.meta.env.VITE_API_URL;
 
+  const handleSocialLogin = (provider: "google" | "github") => {
+    if (!API_URL) {
+      toast.error("API URL is not configured");
+      return;
+    }
+    window.location.href = `${API_URL}/auth/${provider}/login`;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginData.email || !loginData.password) {
@@ -190,14 +198,14 @@ const handleRegister = async (e: React.FormEvent) => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-5">
                   <Button
                     type="button"
-                    onClick={() => toast.info("Google sign-in coming soon")}
+                    onClick={() => handleSocialLogin("google")}
                     className="w-full border border-zinc-700/60 bg-zinc-900/70 text-zinc-100 hover:bg-zinc-800/70"
                   >
                     <Mail className="w-4 h-4 mr-2" /> Google
                   </Button>
                   <Button
                     type="button"
-                    onClick={() => toast.info("GitHub sign-in coming soon")}
+                    onClick={() => handleSocialLogin("github")}
                     className="w-full border border-zinc-700/60 bg-zinc-900/70 text-zinc-100 hover:bg-zinc-800/70"
                   >
                     <Github className="w-4 h-4 mr-2" /> GitHub

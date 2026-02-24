@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Bell, Cog, Shield, ChevronDown, Menu, LogOut } from "lucide-react";
-import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
@@ -29,7 +29,8 @@ const navItems = [
 
 export function TopNav({ userName }: TopNavProps) {
   const { pathname } = useLocation();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const profileImage = user?.profile_image;
 
   const initials = userName
     .split(" ")
@@ -114,6 +115,7 @@ export function TopNav({ userName }: TopNavProps) {
                     </div>
                     <div className="mt-6 border-t border-border/40 pt-4 flex items-center gap-3">
                       <Avatar className="h-8 w-8">
+                        <AvatarImage src={profileImage || undefined} alt={userName} />
                         <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs border-0">
                           {initials}
                         </AvatarFallback>
@@ -153,6 +155,7 @@ export function TopNav({ userName }: TopNavProps) {
                   <Button variant="ghost" size="sm" className="pl-1.5 pr-2 focus-visible:ring-0 hover:bg-secondary/50 rounded-xl transition-all">
                     <span className="inline-flex items-center gap-2">
                       <Avatar className="h-7 w-7">
+                        <AvatarImage src={profileImage || undefined} alt={userName} />
                         <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-[10px] font-bold border-0">
                           {initials}
                         </AvatarFallback>

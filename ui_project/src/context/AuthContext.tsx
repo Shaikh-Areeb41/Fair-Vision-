@@ -1,10 +1,11 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { auth, setToken, removeToken, getToken, getUser } from "../lib/api";
 import { toast } from "sonner";
 
 interface AuthContextType {
   user: any;
   login: (email: string, password: string) => Promise<void>;
+  loginWithToken: (token: string, user: { email: string; full_name: string; profile_image?: string | null }) => void;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   isLoading: boolean;
@@ -26,7 +27,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Fix: Added types here
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     try {
       const data = await auth.login(email, password);
       setToken(data.access_token);
@@ -38,10 +39,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.error(err.response?.data?.detail || "Login failed");
       throw err;
     }
-  };
+  }, []);
 
   // Fix: Added types here
-  const register = async (email: string, password: string, name: string) => {
+  const register = useCallback(async (email: string, password: string, name: string) => {
     try {
       await auth.register(email, password, name);
       await login(email, password); 
@@ -50,19 +51,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       toast.error(err.response?.data?.detail || "Registration failed");
       throw err;
     }
-  };
+  }, [login]);
 
-  const logout = () => {
+  const loginWithToken = useCallback((token: string, oauthUser: { email: string; full_name: string; profile_image?: string | null }) => {
+    setToken(token);
+    localStorage.setItem("access_token", token);
+    localStorage.setItem("fv_user", JSON.stringify(oauthUser));
+    setUser(oauthUser);
+  }, []);
+
+  const logout = useCallback(() => {
     removeToken();
     localStorage.removeItem("fv_user");
     setUser(null);
     toast.info("Logged out successfully");
     localStorage.removeItem("dashboardData");
     localStorage.removeItem("analysisResults");
-  };
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, login, loginWithToken, register, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
