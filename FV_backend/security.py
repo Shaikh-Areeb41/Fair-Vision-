@@ -2,9 +2,10 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
 import hashlib  # <--- NEW IMPORT
+import os
 
 # CONFIGURATION
-SECRET_KEY = "fairvision_secret_key_change_this_in_prod"
+SECRET_KEY = os.getenv("SECRET_KEY", "fairvision_secret_key_change_this_in_prod")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 PASSWORD_RESET_EXPIRE_MINUTES = 30
