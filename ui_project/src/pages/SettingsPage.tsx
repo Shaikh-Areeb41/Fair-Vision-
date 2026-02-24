@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
-import { Avatar, AvatarFallback } from "../components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { toast } from "sonner";
 
 export function SettingsPage() {
@@ -165,13 +165,13 @@ export function SettingsPage() {
                     <CardContent className="space-y-6">
                     <div className="flex items-center gap-6">
                         <Avatar className="h-20 w-20 border-2 border-border">
+                        <AvatarImage src={user?.profile_image || undefined} alt={user?.full_name} />
                         <AvatarFallback className="text-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
                             {initials}
                         </AvatarFallback>
                         </Avatar>
                         <div className="space-y-1">
                         <h3 className="font-medium leading-none text-lg">{user?.full_name || "User"}</h3>
-                        <p className="text-sm text-muted-foreground">Full Access Administrator</p>
                         </div>
                     </div>
 

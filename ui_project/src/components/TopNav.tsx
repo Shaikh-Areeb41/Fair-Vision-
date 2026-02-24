@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { Bell, Cog, Shield, ChevronDown, Menu, LogOut } from "lucide-react";
+import { Cog, Shield, ChevronDown, Menu, LogOut } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
@@ -136,13 +136,6 @@ export function TopNav({ userName }: TopNavProps) {
               </div>
 
               {/* --- DESKTOP ACTIONS --- */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hover:bg-secondary/50 rounded-lg text-muted-foreground hover:text-foreground"
-              >
-                <Bell className="w-5 h-5" />
-              </Button>
               <Link to="/settings">
                 <Button variant="ghost" size="icon" className="hover:bg-secondary/50 rounded-lg text-muted-foreground hover:text-foreground">
                   <Cog className="w-5 h-5" />
