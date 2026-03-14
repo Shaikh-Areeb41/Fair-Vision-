@@ -15,8 +15,8 @@ export function FileUpload({
   onFileSelect,
   selectedFile,
   disabled,
-  acceptedTypes = ".pkl,.joblib,.h5,.pt",
-  placeholder = "ML model file",
+  acceptedTypes = "*",
+  placeholder = "file",
 }: FileUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,12 +60,12 @@ export function FileUpload({
     <div className="space-y-4">
       {!selectedFile ? (
         <Card
-          className={`border-2 border-dashed transition-all duration-200 cursor-pointer shadow-[0px_4px_12px_rgba(0,0,0,0.5)] ${
+          className={`fv-panel border-2 border-dashed transition-all duration-200 cursor-pointer ${
             isDragOver
-              ? "border-[#4F9AFF] bg-[#4F9AFF]/10 shadow-[0px_0px_16px_rgba(79,154,255,0.3)]"
+              ? "border-info/70 bg-info/10"
               : disabled
-              ? "border-[#2E2E2E] bg-[#1E1E1E]"
-              : "border-[#3A3A3A] hover:border-[#4F9AFF] hover:bg-[#2A2A2A]"
+              ? "border-border bg-muted/40 cursor-not-allowed"
+              : "border-border hover:border-info/50 hover:bg-muted/40"
           }`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -75,32 +75,32 @@ export function FileUpload({
           <CardContent className="flex flex-col items-center justify-center py-8">
             <Upload
               className={`w-8 h-8 mb-4 ${
-                disabled ? "text-[#757575]" : "text-[#4F9AFF]"
+                disabled ? "text-muted-foreground" : "text-info"
               }`}
             />
             <p
               className={`text-center ${
-                disabled ? "text-[#757575]" : "text-[#B0B0B0]"
+                disabled ? "text-muted-foreground" : "text-foreground"
               }`}
             >
               Drag and drop your {placeholder} here, or click to browse
             </p>
-            <p className="text-xs text-[#757575] mt-2">
+            <p className="text-xs text-muted-foreground mt-2">
               Supported formats:{" "}
               {acceptedTypes.replace(/\./g, "").toUpperCase()}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <Card className="border-[#28C76F] bg-[#28C76F]/10 shadow-[0px_4px_12px_rgba(0,0,0,0.5)]">
+        <Card className="fv-panel border-success/40 bg-success/10">
           <CardContent className="flex items-center justify-between py-4">
             <div className="flex items-center gap-3">
-              <File className="w-5 h-5 text-[#28C76F]" />
+              <File className="w-5 h-5 text-success" />
               <div>
-                <p className="font-medium text-[#28C76F]">
+                <p className="font-medium text-success">
                   {selectedFile.name}
                 </p>
-                <p className="text-xs text-[#28C76F]/80">
+                <p className="text-xs text-success/80">
                   {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                 </p>
               </div>
@@ -110,7 +110,7 @@ export function FileUpload({
                 variant="ghost"
                 size="sm"
                 onClick={handleRemoveFile}
-                className="text-[#28C76F] hover:text-[#28C76F] hover:bg-[#28C76F]/20"
+                className="text-success hover:text-success hover:bg-success/20"
               >
                 <X className="w-4 h-4" />
               </Button>

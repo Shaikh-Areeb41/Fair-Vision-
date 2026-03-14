@@ -8,7 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../co
 import { Button } from "../components/ui/button";
 import { toast } from "sonner";
 import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
-const API_URL = import.meta.env.VITE_API_URL; 
+import { getToken } from "../lib/api";
+
+const API_URL = (() => {
+  const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+  const base = raw && raw.length > 0 ? raw.replace(/\/$/, "") : "http://127.0.0.1:8000/api";
+  return /\/api$/i.test(base) ? base : `${base}/api`;
+})();
 
 interface MitigationPageProps {
   onApply?: () => void;
@@ -30,7 +36,11 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
 
   const fetchData = async (id: string) => {
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      if (!token) {
+        toast.error("Session expired. Please sign in again.");
+        return;
+      }
       const res = await axios.get(`${API_URL}/datasets/${id}`, {
          headers: { Authorization: `Bearer ${token}` }
       });
@@ -38,9 +48,9 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
       if (res.data?.analysis) setOriginalData(res.data.analysis);
       if (res.data?.mitigation) setMitigatedData(res.data.mitigation);
       
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      toast.error("Could not load analysis data.");
+      toast.error(e?.response?.data?.detail || "Could not load analysis data.");
     }
   };
 
@@ -48,7 +58,11 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
     if (!datasetId) return;
     setLoading(true);
     try {
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      if (!token) {
+        toast.error("Session expired. Please sign in again.");
+        return;
+      }
       const response = await axios.post(`${API_URL}/mitigation/${datasetId}/apply`, {}, {
          headers: { Authorization: `Bearer ${token}` }
       });
@@ -65,9 +79,9 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
       toast.success("Mitigation applied successfully.");
       if (onApply) onApply();
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast.error("Simulation failed. Check console for details.");
+      toast.error(error?.response?.data?.detail || "Simulation failed. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -75,9 +89,12 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
 
   // --- HELPER: SAFE NUMBER FORMATTER ---
   // Prevents "Cannot read properties of undefined"
-  const safeFormat = (val: any, decimals: number = 1, multiplier: number = 100) => {
+  const safeFormat = (val: any, decimals: number = 1) => {
     if (val === undefined || val === null) return "0.0";
-    return (val * multiplier).toFixed(decimals);
+    const parsed = Number(val);
+    if (!Number.isFinite(parsed)) return "0.0";
+    const normalized = parsed <= 1 ? parsed * 100 : parsed;
+    return normalized.toFixed(decimals);
   };
 
   const safeFixed = (val: any, decimals: number = 3) => {
@@ -97,7 +114,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto min-h-screen animate-in fade-in duration-500">
+    <div className="p-6 max-w-[1400px] mx-auto min-h-screen animate-in fade-in duration-500">
       <div className="flex items-center gap-4 mb-8">
         <Link to="/dashboard">
           <Button variant="outline" size="sm">
@@ -107,7 +124,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
         </Link>
         <div>
           <h1 className="text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
-            <Sliders className="w-8 h-8 text-purple-600" />
+            <Sliders className="w-8 h-8 text-primary" />
             Fairness Simulator
           </h1>
           <p className="text-muted-foreground mt-1">
@@ -119,25 +136,25 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* LEFT COLUMN */}
         <div className="lg:col-span-4 space-y-6">
-          <Card className="glass-card border-purple-200 dark:border-purple-800">
+          <Card className="fv-panel border-primary/30">
             <CardHeader>
               <CardTitle>Recommended Strategy</CardTitle>
               <CardDescription>Based on your analysis results.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="p-4 border-2 border-purple-600 bg-purple-50 dark:bg-purple-900/20 rounded-xl cursor-pointer relative overflow-hidden transition-all hover:scale-[1.02]">
-                <div className="absolute top-0 right-0 bg-purple-600 text-white text-xs px-2 py-1 rounded-bl-lg font-medium">Best Fit</div>
-                <h3 className="font-bold text-purple-900 dark:text-purple-100 flex items-center gap-2">
+              <div className="p-4 border-2 border-[rgb(var(--status-analytics))]/60 bg-[rgb(var(--status-analytics-soft))]/50 rounded-xl cursor-pointer relative overflow-hidden transition-all hover:scale-[1.01]">
+                <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs px-2 py-1 rounded-bl-lg font-medium">Best Fit</div>
+                <h3 className="font-bold text-foreground flex items-center gap-2">
                   <RefreshCw className="w-4 h-4" /> Threshold Optimizer
                 </h3>
-                <p className="text-sm text-purple-800 dark:text-purple-200 mt-2 leading-relaxed">
+                <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                   Adjusts the acceptance threshold for unprivileged groups to equalize selection rates.
                 </p>
               </div>
 
               <div className="mt-6">
                 <Button 
-                  className="w-full bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg" 
+                  className="w-full shadow-lg" 
                   size="lg"
                   onClick={handleApplyMitigation}
                   disabled={loading}
@@ -158,8 +175,8 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
         {/* RIGHT COLUMN */}
         <div className="lg:col-span-8">
           {!mitigatedData ? (
-             <div className="h-full flex flex-col items-center justify-center p-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl bg-zinc-50/50 dark:bg-zinc-900/50">
-                <div className="p-4 bg-white dark:bg-zinc-800 rounded-full shadow-sm mb-4">
+             <div className="h-full flex flex-col items-center justify-center p-12 border-2 border-dashed border-border rounded-xl bg-muted/20 fv-panel">
+               <div className="p-4 bg-card rounded-full shadow-sm mb-4">
                     <Scale className="w-8 h-8 text-muted-foreground" />
                 </div>
                 <h3 className="text-lg font-medium text-foreground">Results will appear here</h3>
@@ -171,7 +188,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
             <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  {/* DPD Comparison */}
-                 <Card className="glass-card">
+                 <Card className="fv-panel">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Demographic Parity Diff</CardTitle>
                     </CardHeader>
@@ -182,22 +199,22 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
                             <div className="text-2xl font-bold text-foreground">
                                 {safeFixed(originalData?.dpd)}
                             </div>
-                            <div className="text-xs text-red-500 font-medium">Before</div>
+                            <div className="text-xs text-destructive font-medium">Before</div>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-zinc-300 dark:text-zinc-600" />
+                          <ArrowRight className="w-6 h-6 text-muted-foreground/50" />
                         <div>
                             {/* SAFE FORMATTING */}
-                            <div className="text-3xl font-bold text-emerald-600">
+                            <div className="text-3xl font-bold text-success">
                                 {safeFixed(mitigatedData.projected_dpd)}
                             </div>
-                            <div className="text-xs text-emerald-600 font-bold">After Mitigation</div>
+                            <div className="text-xs text-success font-bold">After Mitigation</div>
                         </div>
                       </div>
                     </CardContent>
                  </Card>
 
                  {/* Accuracy Comparison */}
-                 <Card className="glass-card">
+                 <Card className="fv-panel">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground">Model Accuracy</CardTitle>
                     </CardHeader>
@@ -210,13 +227,13 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
                             </div>
                             <div className="text-xs font-medium">Before</div>
                         </div>
-                        <ArrowRight className="w-6 h-6 text-zinc-300 dark:text-zinc-600" />
+                        <ArrowRight className="w-6 h-6 text-muted-foreground/50" />
                         <div>
                             {/* SAFE FORMATTING */}
-                            <div className="text-3xl font-bold text-blue-600">
+                            <div className="text-3xl font-bold text-primary">
                                 {safeFormat(mitigatedData.projected_accuracy)}%
                             </div>
-                            <div className="text-xs text-blue-600 font-bold">New Accuracy</div>
+                            <div className="text-xs text-primary font-bold">New Accuracy</div>
                         </div>
                       </div>
                     </CardContent>
@@ -224,18 +241,18 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
               </div>
 
               {/* SUCCESS BANNER */}
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-4 rounded-lg flex items-start gap-3">
-                 <CheckCircle className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <div className="bg-success/10 border border-success/30 p-4 rounded-lg flex items-start gap-3 fv-panel">
+                  <CheckCircle className="w-5 h-5 text-success mt-0.5 flex-shrink-0" />
                  <div>
-                    <h4 className="font-semibold text-emerald-900 dark:text-emerald-100">Mitigation Successful</h4>
-                    <p className="text-sm text-emerald-700 dark:text-emerald-300 mt-1">
+                    <h4 className="font-semibold text-foreground">Mitigation Successful</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
                        Bias (DPD) improved.
                     </p>
                  </div>
               </div>
 
               {/* CHART */}
-              <div className="p-6 border rounded-xl bg-card shadow-sm">
+              <div className="p-6 border rounded-xl fv-panel">
                   <h4 className="font-semibold mb-6 text-sm">Simulated Selection Rates (Post-Mitigation)</h4>
                   <div className="h-[250px] w-full">
                     <BiasBarChart
@@ -246,7 +263,7 @@ export function MitigationPage({ onApply }: MitigationPageProps) {
                           { name: "Unprivileged", rate: safeFormat(mitigatedData.unprivileged_rate) }
                         ]}
                         height={250}
-                        colors={["#10b981", "#34d399"]}
+                        colors={["rgb(var(--status-success))", "rgb(var(--status-success) / 0.78)"]}
                       />
                   </div>
               </div>

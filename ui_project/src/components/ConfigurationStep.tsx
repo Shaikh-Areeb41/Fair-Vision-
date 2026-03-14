@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "./ui/utils";
+import { getToken } from "../lib/api";
 
 interface ConfigurationStepProps {
   datasetId: string;
@@ -37,7 +38,12 @@ interface ConfigurationStepProps {
 }
 
 export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: ConfigurationStepProps) {
-  const API_URL = import.meta.env.VITE_API_URL; 
+  const API_URL = (() => {
+    const raw = (import.meta.env.VITE_API_URL as string | undefined)?.trim();
+    if (!raw) return "http://127.0.0.1:8000/api";
+    const normalized = raw.replace(/\/$/, "");
+    return normalized.endsWith("/api") ? normalized : `${normalized}/api`;
+  })();
   const [columns, setColumns] = useState<string[]>([]);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,7 +77,12 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
       const fetchDataset = async () => {
         setLoading(true);
         try {
-          const token = localStorage.getItem("access_token");
+          const token = getToken();
+          if (!token) {
+            toast.error("Session expired. Please log in again.");
+            onCancel();
+            return;
+          }
           const response = await axios.get(`${API_URL}/datasets/${datasetId}`, {
              headers: { Authorization: `Bearer ${token}` }
           });
@@ -87,9 +98,10 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
           if (!datasetName && response.data.filename) {
              setDatasetName(response.data.filename.replace(".csv", ""));
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error(error);
-          toast.error("Failed to load columns");
+          const message = error?.response?.data?.detail || "Failed to load columns";
+          toast.error(message);
         } finally {
           setLoading(false);
         }
@@ -120,7 +132,12 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
 
     try {
 
-      const token = localStorage.getItem("access_token");
+      const token = getToken();
+      if (!token) {
+        toast.error("Session expired. Please log in again.");
+        onCancel();
+        return;
+      }
       
       // 1. Save Config
       await axios.post(`${API_URL}/datasets/${datasetId}/configure`, {
@@ -132,13 +149,8 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      // 2. TRIGGER ANALYSIS (New Step)
-      toast.info("Starting bias analysis...");
-      await axios.post(`${API_URL}/analysis/${datasetId}/train`, {}, {
-         headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      toast.success("Analysis complete!");
+
+      toast.success("Configuration saved successfully!");
       onComplete(); // Navigate to Dashboard
 
     } catch (error) {
@@ -155,15 +167,15 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onCancel()}>
-      <DialogContent className="sm:max-w-[600px] gap-0 p-0 overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-2xl z-50">
+      <DialogContent className="sm:max-w-[680px] gap-0 p-0 overflow-hidden rounded-xl border border-border bg-background shadow-lg text-foreground">
         
         {/* Header */}
-        <DialogHeader className="p-6 pb-4 bg-zinc-50/50 dark:bg-zinc-900/50 border-b border-zinc-100 dark:border-zinc-800">
-          <DialogTitle className="flex items-center gap-2 text-xl text-foreground">
-             <Settings className="w-5 h-5 text-purple-600" />
+        <DialogHeader className="p-6 pb-5 bg-background border-b border-border">
+          <DialogTitle className="flex items-center gap-2 text-3xl text-foreground">
+             <Settings className="w-5 h-5 text-primary" />
              Dataset Configuration
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-muted-foreground text-sm">
             Map your columns to prepare for bias analysis.
           </DialogDescription>
         </DialogHeader>
@@ -171,8 +183,8 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         {/* Scrollable Content */}
         <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
           {loading ? (
-            <div className="flex flex-col items-center justify-center py-12 space-y-3 text-zinc-500">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+            <div className="flex flex-col items-center justify-center py-12 space-y-3 text-muted-foreground">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
               <p className="text-sm font-medium">Analyzing dataset structure...</p>
             </div>
           ) : (
@@ -180,59 +192,57 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
               
               {/* Dataset Name */}
               <div className="space-y-2">
-                <Label htmlFor="dsName">Analysis Name <span className="text-zinc-400 font-normal">(Optional)</span></Label>
+                <Label htmlFor="dsName" className="text-foreground">Analysis Name <span className="text-muted-foreground font-normal">(Optional)</span></Label>
                 <Input 
                   id="dsName"
                   placeholder="e.g. Credit Risk Model - Jan 2024" 
                   value={datasetName}
                   onChange={(e) => setDatasetName(e.target.value)}
-                  className="bg-zinc-50/50 dark:bg-zinc-900/50"
+                  className="h-12 rounded-xl bg-background text-foreground placeholder:text-muted-foreground border-border"
                 />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Target Column */}
                 <div className="space-y-2">
-                   <Label className="flex items-center gap-1">
-                      Target Column <span className="text-red-500">*</span>
+                   <Label className="flex items-center gap-1 text-foreground">
+                     Target Column <span className="text-destructive">*</span>
                    </Label>
                    <Select value={targetColumn} onValueChange={setTargetColumn}>
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border data-[placeholder]:text-muted-foreground px-4">
                       <SelectValue placeholder="Select column..." />
                     </SelectTrigger>
-                    {/* FIX: Force solid background color to remove glass transparency */}
-                    <SelectContent className="z-[100] max-h-[200px] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-md">
-                      {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    <SelectContent className="z-[100] max-h-[220px] !bg-[rgb(var(--popover))] !text-[rgb(var(--popover-foreground))] !opacity-100 !backdrop-blur-none border border-border shadow-md">
+                      {columns.map(c => <SelectItem key={c} value={c} className="text-popover-foreground">{c}</SelectItem>)}
                     </SelectContent>
                    </Select>
-                   <p className="text-[10px] text-zinc-500">The outcome to predict (e.g. Income)</p>
+                   <p className="text-xs text-muted-foreground">The outcome to predict (e.g. Income)</p>
                 </div>
 
                 {/* Sensitive Attribute */}
                 <div className="space-y-2">
-                   <Label className="flex items-center gap-1">
-                      Sensitive Attribute <span className="text-red-500">*</span>
+                   <Label className="flex items-center gap-1 text-foreground">
+                     Sensitive Attribute <span className="text-destructive">*</span>
                    </Label>
                    <Select value={sensitiveAttribute} onValueChange={setSensitiveAttribute}>
-                    <SelectTrigger className="bg-background">
+                    <SelectTrigger className="h-12 rounded-xl bg-background text-foreground border-border data-[placeholder]:text-muted-foreground px-4">
                       <SelectValue placeholder="Select column..." />
                     </SelectTrigger>
-                    {/* FIX: Force solid background color to remove glass transparency */}
-                    <SelectContent className="z-[100] max-h-[200px] bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-md">
-                      {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    <SelectContent className="z-[100] max-h-[220px] !bg-[rgb(var(--popover))] !text-[rgb(var(--popover-foreground))] !opacity-100 !backdrop-blur-none border border-border shadow-md">
+                      {columns.map(c => <SelectItem key={c} value={c} className="text-popover-foreground">{c}</SelectItem>)}
                     </SelectContent>
                    </Select>
-                   <p className="text-[10px] text-zinc-500">The protected group (e.g. Gender)</p>
+                   <p className="text-xs text-muted-foreground">The protected group (e.g. Gender)</p>
                 </div>
               </div>
 
               {/* Dynamic Group Selection */}
               {sensitiveAttribute && (
-                <div className="rounded-xl border border-purple-100 dark:border-purple-900/50 bg-purple-50/50 dark:bg-purple-900/10 p-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
+                <div className="rounded-xl border border-border bg-card p-4 space-y-4 animate-in slide-in-from-top-2 duration-300">
                   
                   {/* Quick Select Pills */}
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-purple-900 dark:text-purple-200 font-medium">
+                    <div className="flex items-center gap-2 text-sm text-foreground font-medium">
                       <Info className="w-4 h-4" />
                       Available Values (Click to fill)
                     </div>
@@ -243,8 +253,8 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
                           onClick={() => handlePillClick(val)}
                           className={cn(
                             "px-2.5 py-1 text-xs rounded-full border transition-all cursor-pointer",
-                            "bg-white dark:bg-zinc-800 border-purple-200 dark:border-purple-800 text-zinc-700 dark:text-zinc-300",
-                            "hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-400 hover:shadow-sm active:scale-95"
+                            "bg-card border-border text-foreground",
+                            "hover:border-primary hover:text-primary hover:shadow-sm active:scale-95"
                           )}
                         >
                           {val}
@@ -257,37 +267,37 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
                     <div className="space-y-1.5">
-                      <Label className="text-xs uppercase tracking-wider text-zinc-500">Privileged (Advantaged)</Label>
+                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Privileged (Advantaged)</Label>
                       <div className="relative">
                         <Input 
                           placeholder="e.g. Male" 
                           value={privilegedGroup}
                           onChange={(e) => setPrivilegedGroup(e.target.value)}
-                          className="bg-white dark:bg-zinc-950 pr-8"
+                          className="bg-background pr-8 text-foreground placeholder:text-muted-foreground border-border"
                         />
                         {isValidValue(privilegedGroup) && (
-                          <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-3" />
+                          <CheckCircle2 className="w-4 h-4 absolute right-3 top-3 text-[rgb(var(--status-success))]" />
                         )}
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs uppercase tracking-wider text-zinc-500">Unprivileged (Disadvantaged)</Label>
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Unprivileged (Disadvantaged)</Label>
                       <div className="relative">
                          <Input 
                             placeholder="e.g. Female" 
                             value={unprivilegedGroup}
                             onChange={(e) => setUnprivilegedGroup(e.target.value)}
-                            className="bg-white dark:bg-zinc-950 pr-8"
+                            className="bg-background pr-8 text-foreground placeholder:text-muted-foreground border-border"
                           />
                           {isValidValue(unprivilegedGroup) && (
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500 absolute right-3 top-3" />
+                            <CheckCircle2 className="w-4 h-4 absolute right-3 top-3 text-[rgb(var(--status-success))]" />
                           )}
                       </div>
                     </div>
                   </div>
 
                   {validationError && (
-                    <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-3 rounded-md border border-red-200 dark:border-red-800">
+                    <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-md border border-destructive/30">
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       {validationError}
                     </div>
@@ -299,14 +309,14 @@ export function ConfigurationStep({ datasetId, isOpen, onComplete, onCancel }: C
         </div>
 
         {/* Footer */}
-        <DialogFooter className="p-4 border-t border-zinc-100 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-900/50">
-          <Button variant="ghost" onClick={onCancel} disabled={saving}>
+        <DialogFooter className="p-4 border-t border-border bg-background sm:justify-end gap-3">
+          <Button variant="ghost" className="text-foreground hover:bg-muted" onClick={onCancel} disabled={saving}>
             Cancel
           </Button>
           <Button 
             onClick={handleSave} 
             disabled={saving || loading}
-            className="bg-purple-600 hover:bg-purple-700 text-white min-w-[140px]"
+            className="min-w-[160px] h-11 rounded-xl text-primary-foreground disabled:opacity-50 shadow-soft-sm hover:shadow-soft-lg transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] bg-[linear-gradient(120deg,rgb(var(--status-info)),rgb(var(--status-success)))] hover:opacity-95"
           >
             {saving ? (
               <>

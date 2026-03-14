@@ -19,6 +19,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { toast } from "sonner";
+import { getToken } from "../lib/api";
 
 // Charts - Assuming these exist in your project structure
 import { BiasBarChart } from "../components/Charts/BiasBarChart"; 
@@ -28,10 +29,10 @@ const API_URL = import.meta.env.VITE_API_URL;
 // --- INLINE UI COMPONENTS (Preserved from your code) ---
 const Button = ({ className, variant = "default", size = "default", ...props }: any) => {
   const variants: any = {
-    default: "border border-black dark:border-white bg-zinc-900 text-white hover:bg-zinc-800 shadow-soft-sm hover:shadow-soft-lg",
-    secondary: "border border-black dark:border-white bg-card text-foreground hover:bg-muted shadow-soft-sm hover:shadow-soft-lg",
-    ghost: "border border-black dark:border-white text-muted-foreground hover:bg-muted",
-    outline: "border border-black dark:border-white bg-transparent hover:bg-muted text-foreground hover:shadow-soft-sm"
+    default: "border border-border bg-primary text-primary-foreground hover:bg-primary/90 shadow-soft-sm hover:shadow-soft-lg",
+    secondary: "border border-border bg-card text-foreground hover:bg-muted shadow-soft-sm hover:shadow-soft-lg",
+    ghost: "border border-border text-muted-foreground hover:bg-muted",
+    outline: "border border-border bg-transparent hover:bg-muted text-foreground hover:shadow-soft-sm"
   };
   const sizes: any = { default: "h-9 px-4 py-2", sm: "h-8 rounded-md px-3 text-xs", lg: "h-10 rounded-md px-8" };
   return (
@@ -61,7 +62,7 @@ const CardTitle = ({ className, ...props }: any) => (
   <h3 className={`font-semibold leading-none tracking-tight ${className || ""}`} {...props} />
 );
 const CardDescription = ({ className, ...props }: any) => (
-  <p className={`text-sm text-muted-foreground text-zinc-500 dark:text-zinc-400 ${className || ""}`} {...props} />
+  <p className={`text-sm text-muted-foreground ${className || ""}`} {...props} />
 );
 const CardContent = ({ className, ...props }: any) => (
   <div className={`p-6 pt-0 ${className || ""}`} {...props} />
@@ -110,7 +111,9 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
       const fetchDataset = async () => {
         setLoadingDataset(true);
         try {
-          const response = await axios.get(`${API_URL}/datasets/${datasetId}`);
+          const response = await axios.get(`${API_URL}/datasets/${datasetId}`, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+          });
           setData(response.data);
           
           // If the backend has analysis data that is newer or missing from local, use it
@@ -120,10 +123,18 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                  setAnalysisResults(response.data.analysis);
              }
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("Failed to fetch dataset", err);
-          // Don't show error toast if we simply have no ID yet
-          if (datasetId) toast.error("Could not load dataset details.");
+          const status = err?.response?.status;
+
+          if (status === 401 || status === 403 || status === 404) {
+            localStorage.removeItem("activeDatasetId");
+            sessionStorage.removeItem("activeDatasetId");
+            setData(null);
+            setAnalysisResults(null);
+          } else if (datasetId) {
+            toast.error("Could not load dataset details.");
+          }
         } finally {
           setLoadingDataset(false);
         }
@@ -215,35 +226,51 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
       value: analysisResults.dpd.toFixed(3),
       delta: analysisResults.dpd > 0.1 ? "Non-Compliant" : "Compliant",
       Icon: AlertTriangle,
-      tint: analysisResults.dpd > 0.1 ? "from-rose-800 to-orange-800" : "from-emerald-800 to-green-800",
+      tint: analysisResults.dpd > 0.1 ? "fv-status-bg-danger" : "fv-status-bg-success",
+      deltaTone: analysisResults.dpd > 0.1 ? "fv-status-text-danger" : "fv-status-text-success",
     },
     {
       label: "Disparate Impact (DI)",
       value: analysisResults.di.toFixed(2),
       delta: analysisResults.di < 0.8 ? "Adverse Impact" : "Fair",
       Icon: Scale,
-      tint: analysisResults.di < 0.8 ? "from-rose-800 to-red-800" : "from-sky-800 to-blue-800",
+      tint: analysisResults.di < 0.8 ? "fv-status-bg-danger" : "fv-status-bg-info",
+      deltaTone: analysisResults.di < 0.8 ? "fv-status-text-danger" : "fv-status-text-info",
     },
     {
       label: "Model Accuracy",
       value: `${(analysisResults.accuracy * 100).toFixed(1)}%`,
       delta: "Baseline Performance",
       Icon: CheckCircle,
-      tint: "from-emerald-800 to-teal-800",
+      tint: "fv-status-bg-info",
+      deltaTone: "fv-status-text-info",
     },
     {
       label: "Fairness Gap",
       value: `${((analysisResults.privileged_rate - analysisResults.unprivileged_rate) * 100).toFixed(1)}%`,
       delta: "Difference in Selection",
       Icon: BarChart3,
-      tint: "from-violet-800 to-indigo-800",
+      tint: "fv-status-bg-analytics",
+      deltaTone: "fv-status-text-danger",
     },
   ] : [];
+
+  const hasDatasetSelected = !!datasetId;
+  const datasetConfigured = !!(
+    data && (
+      String(data.status || "").toLowerCase() === "configured" ||
+      (data.target_column && data.sensitive_attribute && data.privileged_group && data.unprivileged_group)
+    )
+  );
+  const trainingCompleted = !!(analysisResults || data?.analysis);
+  const mitigationCompleted = !!mitigation;
+  const showConfigurationWarning = hasDatasetSelected && !loadingDataset && !!data && !datasetConfigured;
+  const showTrainingWarning = hasDatasetSelected && !loadingDataset && !!data && datasetConfigured && !trainingCompleted;
 
   const canProceed = !!analysisResults;
 
   return (
-<div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
+<div className="mx-auto max-w-[1400px] px-4 sm:px-6 lg:px-8 py-8 min-h-screen">
       <div className="flex flex-col gap-2 mb-6">
         <h1 className="text-3xl font-bold text-foreground tracking-tight ">
           Compliance Oversight Dashboard
@@ -259,7 +286,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
         <div className="lg:col-span-8 space-y-6">
 
           {/* STATE 1: NO DATA AVAILABLE */}
-          {!datasetId && !analysisResults && (
+          {(!datasetId || !analysisResults) && (
             <Card className="glass-card border-dashed border-2 border-border bg-card">
               <CardContent className="flex flex-col items-center justify-center py-20 text-center">
                 <div className="p-4 rounded-full bg-secondary mb-4">
@@ -272,7 +299,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                   You haven't uploaded a dataset yet. Upload a CSV file to configure and start your bias analysis.
                 </p>
                 <Link to="/upload">
-                  <Button className="bg-zinc-900 text-white hover:bg-zinc-800">
+                  <Button>
                     <Upload className="w-4 h-4 mr-2" /> Upload New Dataset
                   </Button>
                 </Link>
@@ -281,22 +308,22 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
           )}
 
           {/* STATE 2 & 3: DATASET IS LOADED */}
-          {(datasetId || analysisResults) && (
+          {(datasetId && analysisResults) && (
             <>
               {/* Dataset Info Card */}
-              <Card className="glass-card border-l-4 border-l-blue-500 shadow-sm">
+              <Card className="fv-panel fv-accent-left-info shadow-sm">
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Database className="w-5 h-5 text-blue-600" />
-                      <CardTitle className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                      <Database className="w-5 h-5 text-primary" />
+                      <CardTitle className="text-lg font-semibold text-foreground">
                         Current Dataset
                       </CardTitle>
                     </div>
                     {loadingDataset ? (
                       <Badge variant="outline" className="animate-pulse">Loading Details...</Badge>
                     ) : (
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-none">
+                      <Badge variant="secondary" className="bg-info/15 text-info hover:bg-info/20 border border-info/30">
                         {data?.filename || "Active Session"}
                       </Badge>
                     )}
@@ -309,9 +336,9 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         {rowCount !== null ? rowCount.toLocaleString() : "N/A"}
                       </span></span>
                       <span className="text-muted-foreground">Columns: <span className="font-medium text-foreground">{data?.columns?.length ?? "-"}</span></span>
-                      <span className="text-green-600 font-medium flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Configured</span>
+                      <span className="fv-status-text-success font-semibold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Configured</span>
                     </div>
-                  ) : <Loader2 className="w-6 h-6 animate-spin text-zinc-400" />}
+                  ) : <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />}
                 </CardContent>
               </Card>
 
@@ -321,37 +348,47 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
                   
                   {/* Metrics Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    {metrics.map(({ label, value, delta, Icon, tint }) => (
-                      <Card key={label} className="glass-card hover:shadow-md transition-shadow">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    {metrics.map(({ label, value, delta, Icon, tint, deltaTone }) => {
+                      const borderContext = String(deltaTone).includes("success")
+                        ? "fv-accent-left-success"
+                        : String(deltaTone).includes("danger")
+                        ? "fv-accent-left-danger"
+                        : String(deltaTone).includes("analytics")
+                        ? "fv-accent-left-analytics"
+                        : "fv-accent-left-info";
+
+                      return (
+                      <Card key={label} className={`fv-kpi-card fv-panel fv-panel-hover ${borderContext}`}>
                         <CardHeader className="pb-2">
                           <div className="flex justify-between items-center">
-                            <CardTitle className="text-xs font-medium text-muted-foreground uppercase">{label}</CardTitle>
-                            <div className={`p-1.5 rounded-lg bg-gradient-to-br ${tint}`}>
-                              <Icon className="h-4 w-4 text-foreground" />
+                            <CardTitle className="fv-kpi-label">{label}</CardTitle>
+                            <div className={`fv-status-chip ${tint}`}>
+                              <Icon className="h-4 w-4" />
                             </div>
                           </div>
                         </CardHeader>
                         <CardContent>
                           <div className="flex flex-col">
-                            <span className="text-2xl font-bold text-foreground">{value}</span>
-                            <span className={`text-xs mt-1 ${String(delta).includes("Compliant") && !String(delta).includes("Non") ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}`}>
+                            <span className="fv-kpi-value">{value}</span>
+                            <span className={`text-sm mt-1 font-semibold ${deltaTone}`}>
                               {delta}
                             </span>
                           </div>
                         </CardContent>
                       </Card>
-                    ))}
+                    )})}
                   </div>
 
                   {/* Main Disparity Chart */}
-                  <div className="border-l-4 border-l-violet-500 rounded-xl overflow-hidden">
+                  <div className="rounded-xl overflow-hidden">
                     <BiasBarChart
                       title="Selection Rate Disparity (Initial Audit)"
                       description="Visualizing group inequality before remediation."
                       data={chartDataSelection}
                       height={250}
-                      colors={["#8b5cf6", "#ec4899"]} // Violet/Pink
+                      colors={["rgb(var(--status-analytics))", "rgb(var(--status-danger))"]}
+                      className="fv-accent-left-analytics"
                     />
                   </div>
 
@@ -361,18 +398,18 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                         <Activity className="w-5 h-5 text-muted-foreground" /> Detailed Compliance Metrics
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <BiasVerticalBar title="Accuracy" description="Metric Stability" data={chartDataAcc} colors={["#10b981", "#34d399"]} />
-                      <BiasVerticalBar title="False Positive Risk" description="Error Disparity" data={chartDataFPR} colors={["#f59e0b", "#fbbf24"]} />
-                      <BiasVerticalBar title="True Positive Rate" description="Opportunity Rate" data={chartDataTPR} colors={["#3b82f6", "#60a5fa"]} />
+                      <BiasVerticalBar title="Accuracy" description="Metric Stability" data={chartDataAcc} colors={["rgb(var(--status-info))", "rgb(var(--status-info) / 0.75)"]} />
+                      <BiasVerticalBar title="False Positive Risk" description="Error Disparity" data={chartDataFPR} colors={["rgb(var(--status-danger))", "rgb(var(--status-danger) / 0.75)"]} />
+                      <BiasVerticalBar title="True Positive Rate" description="Opportunity Rate" data={chartDataTPR} colors={["rgb(var(--status-analytics))", "rgb(var(--status-analytics) / 0.75)"]} />
                     </div>
                   </div>
 
                   {/* Mitigation Results */}
                   {mitigation && (
-                    <div className="pt-8 border-t border-dashed border-zinc-300 dark:border-zinc-700">
+                    <div className="pt-8 border-t border-dashed border-border">
                       <div className="flex items-center gap-3 mb-6">
-                          <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
-                             <ShieldCheck className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+                              <div className="p-2 bg-success/15 rounded-lg">
+                                <ShieldCheck className="w-6 h-6 text-success" />
                           </div>
                           <div>
                              <h2 className="text-2xl font-bold text-foreground">Projected Remediation Results</h2>
@@ -380,44 +417,45 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                           </div>
                       </div>
 
-                    <div className="grid grid-cols-2 gap-4 mb-6">
-                      <Card className="border-l-4 border-l-emerald-500 p-4 flex justify-between items-center">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                      <Card className="fv-panel fv-accent-left-success p-4 flex justify-between items-center">
                         <div>
                            <p className="text-xs text-muted-foreground font-bold uppercase">Projected Fairness (DPD)</p>
-                           <p className="text-2xl font-bold text-emerald-600">{mitigation.projected_dpd}</p>
+                          <p className="text-2xl font-bold text-success">{mitigation.projected_dpd}</p>
                         </div>
-                        <TrendingUp className="w-8 h-8 text-emerald-200" />
+                        <TrendingUp className="w-8 h-8 text-success/40" />
                       </Card>
-                      <Card className="border-l-4 border-l-blue-500 p-4 flex justify-between items-center">
+                       <Card className="fv-panel fv-accent-left-info p-4 flex justify-between items-center">
                         <div>
                            <p className="text-xs text-muted-foreground font-bold uppercase">Projected Accuracy</p>
-                           <p className="text-2xl font-bold text-blue-600">{formatRate(mitigation.projected_accuracy)}%</p>
+                          <p className="text-2xl font-bold text-primary">{formatRate(mitigation.projected_accuracy)}%</p>
                         </div>
-                        <CheckCircle className="w-8 h-8 text-blue-200" />
+                        <CheckCircle className="w-8 h-8 text-primary/40" />
                       </Card>
                     </div>
 
-                      <div className="border-l-4 border-l-emerald-500 rounded-xl mb-6 overflow-hidden">
+                      <div className="rounded-xl mb-6 overflow-hidden">
                         <BiasBarChart
-                          title="Simulated Selection Rates"
+                          title="Simulated Selection Rates (Post-Mitigation)"
                           description="Outcome distribution after applying remediation."
                           data={mitChartSelection}
                           height={250}
-                          colors={["#10b981", "#34d399"]} 
+                          colors={["rgb(var(--status-success))", "rgb(var(--status-success) / 0.8)"]}
+                          className="fv-accent-left-success"
                         />
                       </div>
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <BiasVerticalBar title="New Accuracy" description="Post-remediation" data={mitChartAcc} colors={["#10b981", "#34d399"]} />
-                        <BiasVerticalBar title="New FPR" description="Post-remediation" data={mitChartFPR} colors={["#f59e0b", "#fbbf24"]} />
-                        <BiasVerticalBar title="New TPR" description="Post-remediation" data={mitChartTPR} colors={["#3b82f6", "#60a5fa"]} />
+                        <BiasVerticalBar title="New Accuracy" description="Post-remediation" data={mitChartAcc} colors={["rgb(var(--chart-3))", "rgb(var(--chart-3) / 0.7)"]} />
+                        <BiasVerticalBar title="New FPR" description="Post-remediation" data={mitChartFPR} colors={["rgb(var(--chart-4))", "rgb(var(--chart-4) / 0.7)"]} />
+                        <BiasVerticalBar title="New TPR" description="Post-remediation" data={mitChartTPR} colors={["rgb(var(--chart-2))", "rgb(var(--chart-2) / 0.7)"]} />
                       </div>
                     </div>
                   )}
 
                   <div className="flex justify-end pt-4 border-t border-border">
                     <Link to="/mitigation">
-                      <Button size="lg" className="bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg">
+                      <Button size="lg" className="shadow-lg">
                         Go to Fairness Simulator <ArrowRight className="ml-2 w-4 h-4" />
                       </Button>
                     </Link>
@@ -431,7 +469,7 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
                     <Card className="glass-card mt-6">
                       <CardHeader className="pb-2">
                         <div className="flex items-center gap-2">
-                          <TableIcon className="w-4 h-4 text-zinc-500" />
+                          <TableIcon className="w-4 h-4 text-muted-foreground" />
                           <CardTitle>Data Preview</CardTitle>
                         </div>
                         <CardDescription>
@@ -491,13 +529,13 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
 
                   {/* VISUAL FEEDBACK LOGIC */}
                   {/* If we have an ID but no results yet, show Ready state */}
-                    <Card className="glass-card border-dashed border-2 border-emerald-200 bg-emerald-50/50 mt-6">
+                    <Card className="glass-card border-dashed border-2 border-success/40 bg-success/10 mt-6">
                       <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                        <CheckCircle className="w-8 h-8 text-emerald-600 mb-4" />
+                        <CheckCircle className="w-8 h-8 text-success mb-4" />
                         <h3 className="text-xl font-bold text-foreground mb-2">Ready to Audit</h3>
                         <p className="text-muted-foreground mb-6">Data configured and verified. Initialize the audit engine.</p>
                         <Link to="/train">
-                          <Button size="lg" className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md">
+                          <Button size="lg" className="bg-success hover:bg-success/90 text-success-foreground shadow-md">
                             Run Compliance Audit <ArrowRight className="ml-2 w-4 h-4" />
                           </Button>
                         </Link>
@@ -513,20 +551,71 @@ export function Dashboard({ datasetId: propDatasetId, analysisData }: DashboardP
         <div className="lg:col-span-4 space-y-6 hidden lg:block ">
           <Card className="glass-card sticky top-6">
             <CardHeader className="pb-4">
-              <div className="p-2 rounded-xl border border-border bg-transparent from-sky-100 to-violet-100 inline-flex">
-                <LayoutDashboard className="w-4 h-4 text-foreground" />
+              <div className="rounded-xl border border-border/70 bg-gradient-to-r from-muted/45 via-muted/25 to-transparent px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-border/70 bg-card">
+                    <LayoutDashboard className="w-4 h-4 text-foreground" />
+                  </div>
+                  <div className="h-1.5 w-16 rounded-full bg-success/60" />
+                  <div className="h-1.5 w-10 rounded-full bg-info/45" />
+                  <div className="h-1.5 w-6 rounded-full bg-muted-foreground/30" />
+                </div>
               </div>
               <CardTitle className="text-lg font-semibold text-foreground mt-2">Remediation Tools</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <Link to="/mitigation">
-                  <Button variant="secondary" className="w-full" disabled={!analysisResults}>Open Fairness Simulator</Button>
-              </Link>
+              {showConfigurationWarning && (
+                <Card className="fv-panel fv-accent-left-danger border border-danger/30 bg-danger/10">
+                  <CardContent className="p-4 pt-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertTriangle className="w-4 h-4 text-danger mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Dataset Configuration Missing</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This dataset has not been configured yet. Please configure the dataset before proceeding to training.
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={datasetId ? `/upload?datasetId=${datasetId}` : "/upload"}>
+                      <Button variant="secondary" className="w-full mt-2">Go to Configure Dataset</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+
+              {showTrainingWarning && (
+                <Card className="fv-panel fv-accent-left-info border border-warning/30 bg-warning/10">
+                  <CardContent className="p-4 pt-4">
+                    <div className="flex items-start gap-2 mb-2">
+                      <AlertTriangle className="w-4 h-4 text-warning mt-0.5" />
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">Model Not Trained</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          This dataset has been configured but training has not been executed. Please train the model before running fairness analysis.
+                        </p>
+                      </div>
+                    </div>
+                    <Link to={datasetId ? `/train?datasetId=${datasetId}` : "/train"}>
+                      <Button variant="secondary" className="w-full mt-2">Go to Training</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+
+              {mitigationCompleted ? (
+                <Link to="/reports">
+                  <Button variant="secondary" className="w-full">View Governance Report</Button>
+                </Link>
+              ) : (
+                <Link to="/mitigation">
+                  <Button variant="secondary" className="w-full" disabled={!trainingCompleted}>Open Fairness Simulator</Button>
+                </Link>
+              )}
               <Link to="/upload">
                 <Button variant="secondary" className="w-full">New Dataset Upload</Button>
               </Link>
               <Link to="/reports">
-                  <Button variant="ghost" className="w-full" disabled={!analysisResults}>Compliance Reports</Button>
+                  <Button variant="ghost" className="w-full" disabled={!trainingCompleted}>Compliance Reports</Button>
               </Link>
               {canProceed ? (
                 <Link to="/reports">

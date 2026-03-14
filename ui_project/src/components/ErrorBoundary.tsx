@@ -24,20 +24,20 @@ export class ErrorBoundary extends React.Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-white dark:bg-zinc-950 p-6">
+        <div className="min-h-screen flex items-center justify-center bg-background p-6">
           <div className="max-w-xl w-full glass-card p-6">
-            <h2 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+            <h2 className="text-xl font-bold text-foreground mb-2">
               Something went wrong
             </h2>
-            <p className="text-zinc-600 dark:text-zinc-400 mb-4">
+            <p className="text-muted-foreground mb-4">
               An unexpected error occurred while rendering the application.
             </p>
-            <details className="text-xs text-zinc-500 dark:text-zinc-500 whitespace-pre-wrap mb-4">
+            <details className="text-xs text-muted-foreground whitespace-pre-wrap mb-4">
               {this.state.error?.message}
             </details>
             <div className="flex gap-2">
               <Button
-                className="bg-gradient-to-r from-sky-500 to-teal-500 text-white hover:from-sky-600 hover:to-teal-600"
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
                 onClick={() => window.location.reload()}
               >
                 Reload App

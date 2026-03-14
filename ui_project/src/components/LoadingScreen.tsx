@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Loader2, ShieldCheck, FileSearch, Database, Lock } from "lucide-react";
 import { motion } from "framer-motion";
+import { createPortal } from "react-dom";
 
 interface LoadingScreenProps {
   title?: string;
@@ -45,8 +46,8 @@ export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProp
 
   const CurrentIcon = steps[step].icon;
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
+  const content = (
+    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm animate-in fade-in duration-300">
       
       {/* Central Card */}
       <div className="w-full max-w-md p-8 space-y-8 text-center">
@@ -54,7 +55,7 @@ export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProp
         {/* Animated Icon */}
         <div className="relative flex items-center justify-center mx-auto w-24 h-24">
           <motion.div 
-            className="absolute inset-0 border-4 border-purple-100 dark:border-purple-900 rounded-full"
+            className="absolute inset-0 border-4 border-primary/20 rounded-full"
             animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
             transition={{ repeat: Infinity, duration: 2 }}
           />
@@ -62,9 +63,9 @@ export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProp
             key={step}
             initial={{ scale: 0.5, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="relative z-10 bg-white dark:bg-zinc-900 p-4 rounded-full shadow-xl border border-purple-100 dark:border-purple-800"
+            className="relative z-10 bg-card p-4 rounded-full shadow-xl border border-primary/20"
           >
-            <CurrentIcon className="w-10 h-10 text-purple-600" />
+            <CurrentIcon className="w-10 h-10 text-primary" />
           </motion.div>
         </div>
 
@@ -85,7 +86,7 @@ export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProp
         <div className="space-y-2">
           <div className="h-2 w-full bg-secondary rounded-full overflow-hidden">
             <motion.div 
-              className="h-full bg-purple-600"
+              className="h-full bg-primary"
               initial={{ width: "0%" }}
               animate={{ width: `${progress}%` }}
               transition={{ ease: "linear" }}
@@ -100,4 +101,10 @@ export function LoadingScreen({ title, subtitle, onComplete }: LoadingScreenProp
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") {
+    return content;
+  }
+
+  return createPortal(content, document.body);
 }

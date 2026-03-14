@@ -60,34 +60,33 @@ function buildMetricsFromResults(res: any) {
       value: dpd.toFixed(3),
       status: dpd > 0.1 ? "Critical Bias" : "Acceptable",
       Icon: AlertTriangle,
-      tint: dpd > 0.1 ? "from-rose-800 to-orange-800" : "from-emerald-800 to-green-800",
+      tone: dpd > 0.1 ? "destructive" : "success",
     },
     {
       label: "Disparate Impact (DI)",
       value: di.toFixed(2),
       status: di < 0.8 ? "Adverse Impact" : "Fair",
       Icon: Scale,
-      tint: di < 0.8 ? "from-rose-800 to-red-800" : "from-sky-800 to-blue-800",
+      tone: di < 0.8 ? "destructive" : "info",
     },
     {
       label: "Model Accuracy",
       value: `${(acc * 100).toFixed(1)}%`,
       status: "Baseline Performance",
       Icon: CheckCircle,
-      tint: "from-emerald-800 to-teal-800",
+      tone: "success",
     },
     {
       label: "Fairness Gap",
       value: `${(gap * 100).toFixed(1)}%`,
       status: gap > 0.1 ? "High Gap" : "Low Gap",
       Icon: BarChart3,
-      tint: "from-violet-800 to-indigo-800",
+      tone: "primary",
     },
   ];
 }
 
 interface AnalysisPageProps {
-  hasModel: boolean;
   trainedModel?: string;
   datasetFile?: File;
   datasetId?: string;
@@ -95,7 +94,6 @@ interface AnalysisPageProps {
 }
 
 export function AnalysisPage({
-  hasModel,
   trainedModel,
   datasetFile,
   datasetId,
@@ -168,20 +166,20 @@ export function AnalysisPage({
           
           {/* 1. METRICS GRID (Summary Cards) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {metrics.map(({ label, value, status, Icon, tint }) => (
+            {metrics.map(({ label, value, status, Icon, tone }) => (
               <Card key={label} className="glass-card hover:shadow-md transition-all">
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-center">
                     <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{label}</CardTitle>
-                    <div className={`p-2 rounded-full bg-gradient-to-br ${tint} shadow-sm`}>
-                      <Icon className="h-4 w-4 text-white" />
+                    <div className={`p-2 rounded-full shadow-sm ${tone === "destructive" ? "bg-destructive/15 text-destructive" : ""}${tone === "success" ? "bg-success/15 text-success" : ""}${tone === "info" ? "bg-info/15 text-info" : ""}${tone === "primary" ? "bg-primary/15 text-primary" : ""}`}>
+                      <Icon className="h-4 w-4" />
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col">
                     <span className="text-2xl font-bold text-foreground">{value}</span>
-                    <span className={`text-xs mt-1 font-medium ${String(status).includes("Bias") || String(status).includes("Adverse") ? "text-red-500" : "text-muted-foreground"}`}>
+                    <span className={`text-xs mt-1 font-medium ${String(status).includes("Bias") || String(status).includes("Adverse") ? "text-destructive" : "text-muted-foreground"}`}>
                       {status}
                     </span>
                   </div>
@@ -200,16 +198,16 @@ export function AnalysisPage({
                 description="The primary indicator of bias. Shows the percentage of each group selected by the model."
                 data={chartData.selection}
                 height={320}
-                colors={["#8b5cf6", "#ec4899"]} 
+                colors={["rgb(var(--chart-1))", "rgb(var(--chart-2))"]}
               />
             </div>
 
             {/* Right: Model Info & Status */}
             <div className="space-y-6">
-              <Card className={`border-l-4 ${isBiased ? "border-l-red-500 bg-red-50/10" : "border-l-green-500 bg-green-50/10"}`}>
+              <Card className={`border-l-4 ${isBiased ? "border-l-destructive bg-destructive/10" : "border-l-success bg-success/10"}`}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    {isBiased ? <AlertTriangle className="text-red-500"/> : <CheckCircle className="text-green-500"/>}
+                    {isBiased ? <AlertTriangle className="text-destructive"/> : <CheckCircle className="text-success"/>}
                     {isBiased ? "Bias Detected" : "Model is Fair"}
                   </CardTitle>
                   <CardDescription>
@@ -255,7 +253,7 @@ export function AnalysisPage({
                   title="Accuracy Comparison"
                   description="Model consistency across groups (Higher is better)."
                   data={chartData.acc}
-                  colors={["#10b981", "#34d399"]} // Emerald
+                  colors={["rgb(var(--chart-3))", "rgb(var(--chart-3) / 0.7)"]}
                 />
                 
                 {/* 2. FPR: Vertical Bar Chart */}
@@ -263,7 +261,7 @@ export function AnalysisPage({
                   title="False Positive Risk"
                   description="Incorrectly approved (Lower is better)."
                   data={chartData.fpr}
-                  colors={["#f59e0b", "#fbbf24"]} // Amber
+                  colors={["rgb(var(--chart-4))", "rgb(var(--chart-4) / 0.7)"]}
                 />
                 
                 {/* 3. TPR: Vertical Bar Chart (Kept same) */}
@@ -271,14 +269,14 @@ export function AnalysisPage({
                   title="True Positive Rate"
                   description="Opportunity comparison (Higher is better)."
                   data={chartData.tpr}
-                  colors={["#3b82f6", "#60a5fa"]} // Blue
+                  colors={["rgb(var(--chart-2))", "rgb(var(--chart-2) / 0.7)"]}
                 />
             </div>
           </div>
 
           {/* FOOTER ACTIONS */}
           <div className="flex justify-center pt-8 pb-4">
-            <Button onClick={onComplete} size="lg" className="px-10 bg-zinc-900 text-white hover:bg-zinc-800 shadow-lg">
+            <Button onClick={onComplete} size="lg" className="px-10 shadow-lg">
               <CheckCircle className="w-4 h-4 mr-2" />
               Complete & Return to Dashboard
             </Button>

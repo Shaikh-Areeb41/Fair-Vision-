@@ -26,8 +26,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLoading(false);
   }, []);
 
+  const clearSessionState = () => {
+    localStorage.removeItem("activeDatasetId");
+    localStorage.removeItem("analysisResults");
+    localStorage.removeItem("dashboardData");
+    sessionStorage.removeItem("activeDatasetId");
+  };
+
   // Fix: Added types here
   const login = useCallback(async (email: string, password: string) => {
+    clearSessionState();
     try {
       const data = await auth.login(email, password);
       setToken(data.access_token);
@@ -43,9 +51,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fix: Added types here
   const register = useCallback(async (email: string, password: string, name: string) => {
+    clearSessionState();
     try {
       await auth.register(email, password, name);
-      await login(email, password); 
+      await login(email, password);
     } catch (err: any) {
       console.error(err);
       toast.error(err.response?.data?.detail || "Registration failed");
@@ -55,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loginWithToken = useCallback((token: string, oauthUser: { email: string; full_name: string; profile_image?: string | null }) => {
     setToken(token);
-    localStorage.setItem("access_token", token);
     localStorage.setItem("fv_user", JSON.stringify(oauthUser));
     setUser(oauthUser);
   }, []);
@@ -63,10 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     removeToken();
     localStorage.removeItem("fv_user");
-    setUser(null);
-    toast.info("Logged out successfully");
     localStorage.removeItem("dashboardData");
     localStorage.removeItem("analysisResults");
+    localStorage.removeItem("activeDatasetId");
+    sessionStorage.removeItem("activeDatasetId");
+    setUser(null);
+    toast.info("Logged out successfully");
   }, []);
 
   return (

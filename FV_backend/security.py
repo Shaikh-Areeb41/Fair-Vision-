@@ -1,11 +1,17 @@
-from passlib.context import CryptContext
-from datetime import datetime, timedelta
-from jose import jwt, JWTError
-import hashlib  # <--- NEW IMPORT
 import os
+import hashlib
+from datetime import datetime, timedelta
+from typing import Optional
 
-# CONFIGURATION
-SECRET_KEY = os.getenv("SECRET_KEY", "fairvision_secret_key_change_this_in_prod")
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY environment variable is not set. "
+        "Set it to a long random string before starting the server."
+    )
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 PASSWORD_RESET_EXPIRE_MINUTES = 30
@@ -13,29 +19,26 @@ PASSWORD_RESET_EXPIRE_MINUTES = 30
 # We revert to a standard configuration since we will handle the length manually
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-def verify_password(plain_password, hashed_password):
-    # 1. Pre-hash with SHA256 to ensure standard length
-    # SHA256 produces a 64-character string, which is always safe for bcrypt (limit 72)
-    safe_password = hashlib.sha256(plain_password.encode('utf-8')).hexdigest()
-    
-    # 2. Verify the safe hash against the stored hash
-    return pwd_context.verify(safe_password, hashed_password)
+def _prehash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-def get_password_hash(password):
-    # 1. Pre-hash with SHA256
-    safe_password = hashlib.sha256(password.encode('utf-8')).hexdigest()
-    
-    # 2. Hash the result with bcrypt
-    return pwd_context.hash(safe_password)
 
-def create_access_token(data: dict):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(_prehash_password(plain_password), hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(_prehash_password(password))
+
+
+def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def create_password_reset_token(email: str):
+
+def create_password_reset_token(email: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
     payload = {
         "sub": email,
@@ -44,7 +47,8 @@ def create_password_reset_token(email: str):
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def verify_password_reset_token(token: str):
+
+def verify_password_reset_token(token: str) -> Optional[str]:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if payload.get("type") != "password_reset":

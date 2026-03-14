@@ -1,13 +1,10 @@
 import { useState } from "react";
 import axios from "axios"; // <--- ADDED MISSING IMPORT
 import { useAuth } from "../context/AuthContext";
-import { useTheme } from "next-themes"; 
 import { 
   User, 
   Mail, 
   Shield, 
-  Moon, 
-  Sun, 
   LogOut, 
   Lock,
   KeyRound,
@@ -15,11 +12,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { ThemeToggle } from "../components/ThemeToggle";
 import { toast } from "sonner";
 
 export function SettingsPage() {
   const { user, logout } = useAuth();
-  const { setTheme, theme } = useTheme();
+    const passwordComplexityMessage = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character.";
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$/;
   
   const [activeTab, setActiveTab] = useState<"general" | "security">("general");
   const [isLoading, setIsLoading] = useState(false);
@@ -41,8 +40,8 @@ export function SettingsPage() {
         toast.error("New passwords do not match");
         return;
     }
-    if (newPassword.length < 6) {
-        toast.error("Password must be at least 6 characters");
+    if (!passwordRegex.test(newPassword)) {
+        toast.error(passwordComplexityMessage);
         return;
     }
 
@@ -143,7 +142,7 @@ export function SettingsPage() {
 
           <Button 
             variant="ghost" 
-            className="justify-start text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/10" 
+                        className="justify-start text-destructive hover:bg-destructive/10" 
             onClick={logout}
           >
             <LogOut className="mr-2 h-4 w-4" /> Log out
@@ -166,7 +165,7 @@ export function SettingsPage() {
                     <div className="flex items-center gap-6">
                         <Avatar className="h-20 w-20 border-2 border-border">
                         <AvatarImage src={user?.profile_image || undefined} alt={user?.full_name} />
-                        <AvatarFallback className="text-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                        <AvatarFallback className="text-xl bg-primary text-primary-foreground">
                             {initials}
                         </AvatarFallback>
                         </Avatar>
@@ -208,24 +207,7 @@ export function SettingsPage() {
                             Select your preferred color scheme.
                         </p>
                         </div>
-                        <div className="flex items-center gap-2 bg-secondary/50 p-1 rounded-lg border border-border">
-                        <Button 
-                            variant={theme === "light" ? "default" : "ghost"} 
-                            size="sm" 
-                            onClick={() => setTheme("light")}
-                            className="h-8 w-8 p-0 rounded-md"
-                        >
-                            <Sun className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                            variant={theme === "dark" ? "default" : "ghost"} 
-                            size="sm" 
-                            onClick={() => setTheme("dark")}
-                            className="h-8 w-8 p-0 rounded-md"
-                        >
-                            <Moon className="h-4 w-4" />
-                        </Button>
-                        </div>
+                        <ThemeToggle />
                     </div>
                     </CardContent>
                 </Card>
@@ -237,13 +219,13 @@ export function SettingsPage() {
                     <CardDescription>Workspace and role management.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                    <div className="flex items-center gap-4 p-4 border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-full">
-                            <Shield className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                    <div className="flex items-center gap-4 p-4 border border-info/30 bg-info/10 rounded-lg">
+                        <div className="p-2 bg-info/15 rounded-full">
+                            <Shield className="w-5 h-5 text-info" />
                         </div>
                         <div>
-                            <h4 className="font-medium text-blue-900 dark:text-blue-100">FairVision Audit License</h4>
-                            <p className="text-sm text-blue-700 dark:text-blue-300">Active • Enterprise Plan</p>
+                            <h4 className="font-medium text-foreground">FairVision Audit License</h4>
+                            <p className="text-sm text-muted-foreground">Active - Enterprise Plan</p>
                         </div>
                     </div>
                     </CardContent>
@@ -316,7 +298,10 @@ export function SettingsPage() {
                             </div>
 
                             <div className="pt-2">
-                                <Button type="submit" disabled={isLoading} className="bg-zinc-900 text-white hover:bg-zinc-800">
+                                <p className="text-xs text-muted-foreground mb-2">
+                                  Password must be at least 8 characters and include uppercase, lowercase, number, and special character.
+                                </p>
+                                <Button type="submit" disabled={isLoading}>
                                     {isLoading ? "Updating..." : "Update Password"}
                                 </Button>
                             </div>

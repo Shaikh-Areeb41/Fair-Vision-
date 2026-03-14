@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from database import users_collection
 from security import (
     verify_password,
@@ -20,21 +20,55 @@ import resend
 import secrets
 from urllib.parse import urlencode
 import httpx
+from pymongo.errors import DuplicateKeyError
+import re
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+PASSWORD_REGEX = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{8,}$"
+PASSWORD_COMPLEXITY_MESSAGE = "Password must be at least 8 characters and include uppercase, lowercase, number, and special character"
+
+
+def _is_strong_password(password: str) -> bool:
+    if len(password) < 8:
+        return False
+    if not re.search(r"[A-Z]", password):
+        return False
+    if not re.search(r"[a-z]", password):
+        return False
+    if not re.search(r"\d", password):
+        return False
+    if not re.search(r"[^A-Za-z\d]", password):
+        return False
+    return True
 
 # Setup for token verification
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # --- 1. MODELS ---
 class UserLogin(BaseModel):
-    email: str
-    password: str
+    email: EmailStr
+    password: str = Field(..., min_length=1)
 
 class UserRegister(BaseModel):
-    email: str
-    password: str
-    full_name: str
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=3, max_length=50)
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_full_name(cls, value: str) -> str:
+        cleaned = value.strip()
+        if not re.fullmatch(r"[A-Za-z]+(?:[ '\-][A-Za-z]+)*", cleaned):
+            raise ValueError("Full name can only contain letters, spaces, hyphens, and apostrophes")
+        return cleaned
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_strength(cls, value: str) -> str:
+        if not _is_strong_password(value):
+            raise ValueError(PASSWORD_COMPLEXITY_MESSAGE)
+        return value
 
 class ChangePasswordRequest(BaseModel):
     current_password: str
@@ -42,10 +76,16 @@ class ChangePasswordRequest(BaseModel):
 
 class ForgotPasswordRequest(BaseModel):
     email: str
+    theme: str | None = None
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
 
 
 def _build_frontend_url(path: str = "/login") -> str:
@@ -104,12 +144,15 @@ async def _create_or_update_oauth_user(email: str, full_name: str, provider: str
         "hashed_password": get_password_hash(generated_password),
         "auth_provider": provider,
         "profile_image": profile_image,
+        "emailVerified": True,
+        "verificationCode": None,
+        "verificationExpires": None,
     }
     await users_collection.insert_one(user_doc)
     return {"email": email, "full_name": user_doc["full_name"], "profile_image": user_doc.get("profile_image")}
 
 
-def send_reset_email(recipient_email: str, reset_link: str):
+def send_email_with_resend(recipient_email: str, subject: str, html_body: str):
     api_key = os.getenv("RESEND_API_KEY")
     smtp_from = os.getenv("SMTP_FROM", "onboarding@resend.dev")
 
@@ -117,30 +160,54 @@ def send_reset_email(recipient_email: str, reset_link: str):
         raise RuntimeError("RESEND_API_KEY is not configured in environment variables.")
 
     resend.api_key = api_key
-    
-    email_body = f"""
-    <html>
-      <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>FairVision Password Reset</h2>
-        <p>You requested a password reset for your FairVision account.</p>
-        <p>
-          <a href="{reset_link}" style="background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
-            Reset Your Password
-          </a>
-        </p>
-        <p>Or copy this link: <a href="{reset_link}">{reset_link}</a></p>
-        <p>If you did not request this, you can safely ignore this email.</p>
-        <p><small>This link expires in 30 minutes.</small></p>
-      </body>
-    </html>
-    """
-    
+
     resend.Emails.send({
         "from": smtp_from,
         "to": recipient_email,
-        "subject": "FairVision Password Reset",
-        "html": email_body,
+        "subject": subject,
+        "html": html_body,
     })
+
+
+def send_reset_email(recipient_email: str, reset_link: str):
+    send_email_with_resend(
+        recipient_email=recipient_email,
+        subject="FairVision Password Reset",
+        html_body=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <h2>FairVision Password Reset</h2>
+                <p>You requested a password reset for your FairVision account.</p>
+                <p>
+                    <a href="{reset_link}" style="background-color: #0066cc; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                        Reset Your Password
+                    </a>
+                </p>
+                <p>Or copy this link: <a href="{reset_link}">{reset_link}</a></p>
+                <p>If you did not request this, you can safely ignore this email.</p>
+                <p><small>This link expires in 30 minutes.</small></p>
+            </body>
+        </html>
+        """,
+    )
+
+
+def send_verification_email(recipient_email: str, code: str):
+    send_email_with_resend(
+        recipient_email=recipient_email,
+        subject="Verify your account",
+        html_body=f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                <h2>Verify your account</h2>
+                <p>Your verification code is:</p>
+                <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px;">{code}</p>
+                <p>Enter this code in the verification page to activate your account.</p>
+                <p><small>This code expires in 10 minutes.</small></p>
+            </body>
+        </html>
+        """,
+    )
 
 # --- 2. HELPER: GET CURRENT USER ---
 # This decodes the token to find out WHO is trying to change the password
@@ -171,29 +238,78 @@ async def register(user: UserRegister):
         raise HTTPException(status_code=400, detail="Email already registered")
     
     hashed_pw = get_password_hash(user.password)
+    verification_code = f"{secrets.randbelow(900000) + 100000}"
+    verification_expires = datetime.utcnow() + timedelta(minutes=10)
     user_dict = {
         "email": user.email, 
         "full_name": user.full_name, 
-        "hashed_password": hashed_pw
+        "hashed_password": hashed_pw,
+        "emailVerified": False,
+        "verificationCode": verification_code,
+        "verificationExpires": verification_expires,
     }
-    result = await users_collection.insert_one(user_dict)
-    return {"id": str(result.inserted_id), "email": user.email, "message": "User created"}
+    try:
+        result = await users_collection.insert_one(user_dict)
+    except DuplicateKeyError:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    response = {
+        "id": str(result.inserted_id),
+        "email": user.email,
+        "message": "User created. Verification code sent.",
+    }
+    try:
+        send_verification_email(user.email, verification_code)
+    except Exception as exc:
+        print(f"WARN: Failed to send verification email for {user.email}: {exc}")
+        if os.getenv("APP_ENV", "development").lower() != "production":
+            response["dev_verification_code"] = verification_code
+            response["email_status"] = "failed"
+
+    return response
+
+
+@router.post("/verify")
+async def verify_email(request: VerifyEmailRequest):
+    db_user = await users_collection.find_one({"email": request.email})
+    if not db_user:
+        raise HTTPException(status_code=400, detail="Invalid email or verification code")
+
+    if db_user.get("emailVerified"):
+        return {"message": "Email already verified"}
+
+    if db_user.get("verificationCode") != request.code:
+        raise HTTPException(status_code=400, detail="Invalid email or verification code")
+
+    expires_at = db_user.get("verificationExpires")
+    if not expires_at or datetime.utcnow() > expires_at:
+        raise HTTPException(status_code=400, detail="Verification code expired")
+
+    await users_collection.update_one(
+        {"_id": db_user["_id"]},
+        {
+            "$set": {
+                "emailVerified": True,
+                "verificationCode": None,
+                "verificationExpires": None,
+            }
+        },
+    )
+
+    return {"message": "Email verified successfully"}
 
 @router.post("/login")
 async def login(user: UserLogin):
     db_user = await users_collection.find_one({"email": user.email})
     if not db_user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     hashed_password = db_user.get("hashed_password")
     if not hashed_password or not verify_password(user.password, hashed_password):
-        provider = db_user.get("auth_provider")
-        if provider in {"google", "github"}:
-            raise HTTPException(
-                status_code=401,
-                detail=f"This account uses {provider.title()} sign-in. Please use the social login button.",
-            )
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
+    if not db_user.get("emailVerified", False):
+        raise HTTPException(status_code=403, detail="Please verify your email first")
     
     access_token = create_access_token(data={"sub": user.email, "full_name": db_user["full_name"]})
     
@@ -201,9 +317,11 @@ async def login(user: UserLogin):
         "access_token": access_token, 
         "token_type": "bearer",
         "user": {
+            "id": str(db_user["_id"]),
             "email": db_user["email"],
             "full_name": db_user["full_name"],
             "profile_image": db_user.get("profile_image"),
+            "is_admin": bool(db_user.get("is_admin", False)),
         }
     }
 
@@ -421,6 +539,9 @@ async def change_password(
     if not verify_password(request.current_password, current_user["hashed_password"]):
         raise HTTPException(status_code=400, detail="Current password is incorrect")
 
+    if not _is_strong_password(request.new_password):
+        raise HTTPException(status_code=400, detail=PASSWORD_COMPLEXITY_MESSAGE)
+
     new_hashed_password = get_password_hash(request.new_password)
     update_result = await users_collection.update_one(
         {"_id": current_user["_id"]},
@@ -453,7 +574,10 @@ async def forgot_password(request: ForgotPasswordRequest):
         )
 
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:5173")
-        reset_link = f"{frontend_url.rstrip('/')}/reset-password?token={reset_token}"
+        reset_params = {"token": reset_token}
+        if request.theme in {"light", "dark", "warm"}:
+            reset_params["theme"] = request.theme
+        reset_link = f"{frontend_url.rstrip('/')}/reset-password?{urlencode(reset_params)}"
         email_sent = True
         try:
             send_reset_email(request.email, reset_link)
@@ -488,6 +612,9 @@ async def reset_password(request: ResetPasswordRequest):
 
     if not expires_at or datetime.utcnow() > expires_at:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    if not _is_strong_password(request.new_password):
+        raise HTTPException(status_code=400, detail=PASSWORD_COMPLEXITY_MESSAGE)
 
     new_hashed_password = get_password_hash(request.new_password)
     await users_collection.update_one(

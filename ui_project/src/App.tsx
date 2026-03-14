@@ -5,16 +5,20 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PageTransition } from "./components/motion/PageTransition";
 import { TopNav } from "./components/TopNav";
 import { Dashboard } from "./components/Dashboard";
-import { UploadPage } from "./components/UploadPage"; 
-import { TrainingPage } from "./components/TrainingPage";
+import { UploadPage } from "./pages/UploadPage";
+import { TrainingPage } from "./pages/TrainingPage";
 import { MitigationPage } from "./pages/MitigationPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
+import { VerifyEmailPage } from "./pages/VerifyEmailPage";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { HistoryPage } from "./pages/HistoryPage"; 
 import { SettingsPage } from "./pages/SettingsPage"; // <--- 1. IMPORT SETTINGS
 import { LoadingScreen } from "./components/LoadingScreen"; 
+import { AuditIntelligencePage } from "./pages/AuditIntelligencePage";
+import { AdminTestPage } from "./pages/AdminTestPage";
+import { ThemeToggle } from "./components/ThemeToggle";
 
 type AppState = {
   isLoading: boolean;
@@ -24,10 +28,14 @@ type AppState = {
 
 const ProtectedLayout = ({ children, userName }: { children: React.ReactNode, userName: string }) => {
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen fv-shell flex flex-col">
       <TopNav userName={userName} />
       <div className="flex-1 overflow-auto">
         {children}
+      </div>
+      {/* Temporary testing placement requested by user */}
+      <div className="fixed left-4 bottom-4 z-[80]">
+        <ThemeToggle />
       </div>
     </div>
   );
@@ -45,8 +53,6 @@ function AppContent() {
   });
 
   const handleUploadComplete = (data: {
-    hasModel: boolean;
-    modelFile?: File | null;
     datasetFile?: File | null;
     datasetId?: string;
     id?: string;
@@ -56,13 +62,9 @@ function AppContent() {
     if (finalId) {
       localStorage.setItem("activeDatasetId", finalId);
       sessionStorage.setItem("activeDatasetId", finalId); 
-    } 
+    }
 
-    setAppState({
-      isLoading: true,
-      loadingTitle: data.hasModel ? "Checking Your Model" : "Preparing Training",
-      loadingSubtitle: data.hasModel ? "Validating compatibility" : "Setting up environment",
-    });
+    navigate("/train");
   };
 
   const handleLoadingComplete = () => {
@@ -72,8 +74,8 @@ function AppContent() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950">
-        <div className="animate-pulse text-sm text-zinc-500">Initializing Secure Session...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-pulse text-sm text-muted-foreground">Initializing Secure Session...</div>
       </div>
     );
   }
@@ -93,6 +95,7 @@ function AppContent() {
       <Routes location={location} key={location.pathname}>
         
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
         <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -153,6 +156,28 @@ function AppContent() {
                 <HistoryPage />
               </PageTransition>
             </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/audit-intelligence" element={
+          user ? (
+            <ProtectedLayout userName={user.full_name}>
+              <PageTransition>
+                <AuditIntelligencePage />
+              </PageTransition>
+            </ProtectedLayout>
+          ) : <Navigate to="/login" />
+        } />
+
+        <Route path="/admin-test" element={
+          user ? (
+            Boolean(user.is_admin) ? (
+              <ProtectedLayout userName={user.full_name}>
+                <PageTransition>
+                  <AdminTestPage />
+                </PageTransition>
+              </ProtectedLayout>
+            ) : <Navigate to="/dashboard" replace />
           ) : <Navigate to="/login" />
         } />
 

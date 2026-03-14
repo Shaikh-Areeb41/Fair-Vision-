@@ -1,23 +1,22 @@
 import os
 from pathlib import Path
+
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
-load_dotenv(BASE_DIR / ".env")
+ENV_FILE = BASE_DIR / ".env"
+load_dotenv(ENV_FILE)
 
-# Get the connection string from .env
-MONGODB_URL = os.getenv("MONGODB_URL")
-DB_NAME = os.getenv("DB_NAME", "fairvision_db")
+MONGO_URL = os.getenv("MONGODB_URL")
+DATABASE_NAME = os.getenv("DB_NAME", "fairvision_db")
 
-if not MONGODB_URL:
+if not MONGO_URL:
     raise ValueError("No MONGODB_URL found in .env file")
 
-client = AsyncIOMotorClient(MONGODB_URL)
-db = client[DB_NAME]
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DATABASE_NAME]
 
-# Define our collections
 datasets_collection = db.get_collection("datasets")
-models_collection = db.get_collection("ml_models")
-# --- NEW: AUTH COLLECTION ---
 users_collection = db.get_collection("users")
+reports_collection = db.get_collection("reports")

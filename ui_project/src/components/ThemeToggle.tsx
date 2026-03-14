@@ -1,19 +1,45 @@
-import { Moon, Sun } from "lucide-react";
+import { Moon, Palette, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
-import { Button } from "./ui/button";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const activeTheme = (theme === "system" ? resolvedTheme : theme) ?? "light";
+
+  const handleThemeChange = (nextTheme: "light" | "dark" | "warm") => {
+    setTheme(nextTheme);
+    localStorage.setItem("theme", nextTheme);
+  };
+
+  if (!mounted) {
+    return (
+      <div className="h-10 w-[132px] rounded-lg border border-border bg-card/60" aria-hidden="true" />
+    );
+  }
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-      aria-label="Toggle theme"
-    >
-      <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-      <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-    </Button>
+    <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-card/70 px-2 py-1 shadow-soft-sm">
+      <span className="text-muted-foreground">
+        {activeTheme === "dark" ? <Moon className="h-4 w-4" /> : activeTheme === "warm" ? <Palette className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+      </span>
+      <label htmlFor="theme-selector" className="sr-only">Theme</label>
+      <select
+        id="theme-selector"
+        className="h-8 rounded-md border border-input bg-background px-2 text-xs font-medium text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        value={activeTheme}
+        onChange={(event) => handleThemeChange(event.target.value as "light" | "dark" | "warm")}
+        aria-label="Select theme"
+      >
+        <option value="light">Light</option>
+        <option value="dark">Dark</option>
+        <option value="warm">Warm Orange</option>
+      </select>
+    </div>
   );
 }

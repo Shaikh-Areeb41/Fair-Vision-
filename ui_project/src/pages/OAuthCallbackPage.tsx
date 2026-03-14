@@ -43,8 +43,8 @@ export function OAuthCallbackPage() {
   }, [searchParams, navigate, loginWithToken]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-zinc-950">
-      <div className="text-center text-zinc-200">
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-center text-foreground">
         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-3" />
         <p>Finalizing secure sign-in...</p>
       </div>
